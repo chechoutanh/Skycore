@@ -1,0 +1,348 @@
+% SkyScore - Báo cáo dự án
+% Biên dịch: pdfLaTeX (hoặc XeLaTeX) trên Overleaf / TeX Live / MiKTeX.
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,tabularx,array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{codebg}{RGB}{246,246,246}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, columns=fullflexible,
+  keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  showstringspaces=false
+}
+
+\newcommand{\ind}{\mathbb{1}}
+\newcommand{\arcsec}{\ensuremath{''}}
+
+\title{\textbf{SkyScore}\\[4pt]
+\large Hệ thống lập kế hoạch thời điểm quan sát thiên văn\\
+đa mục tiêu kết hợp học máy dự báo seeing}
+\author{Nhóm thực hiện: \underline{\hspace{6cm}}}
+\date{Tháng 11 năm 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+SkyScore trả lời câu hỏi thực tiễn của các câu lạc bộ thiên văn: \emph{``Tối nay, vào lúc nào
+nên quan sát một mục tiêu cho trước?''}. Hệ thống kết hợp (i) tính toán vị trí thiên thể bằng
+Astropy, (ii) dự báo thời tiết theo giờ từ Open-Meteo, (iii) mô hình Random Forest ước lượng
+\emph{seeing} khí quyển và (iv) một hàm điểm đa mục tiêu minh bạch có ràng buộc cứng. Ngoài
+khung giờ tốt nhất, hệ thống còn cung cấp tập nghiệm Pareto và phân tích độ nhạy theo trọng số
+bằng phân phối Dirichlet. Kết quả được trình bày trên giao diện web Streamlit. Mô hình seeing
+hiện được huấn luyện trên nhãn giả lập (MAE $0{,}17\arcsec$, $R^2 = 0{,}96$ theo kiểm định
+chéo chuỗi thời gian); chúng tôi thảo luận rõ giới hạn này và lộ trình thay bằng dữ liệu đo thật.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%=====================================================================
+\section{Đặt vấn đề}
+
+Chất lượng một buổi quan sát thiên văn phụ thuộc đồng thời vào nhiều yếu tố:
+\begin{itemize}[nosep]
+  \item \textbf{Hình học thiên văn}: mục tiêu phải đủ cao trên đường chân trời; trời phải đủ tối.
+  \item \textbf{Mặt Trăng}: trăng sáng, đã mọc và nằm gần mục tiêu làm bầu trời sáng lên.
+  \item \textbf{Thời tiết}: mây che là yếu tố loại trừ gần như tuyệt đối.
+  \item \textbf{Seeing}: nhiễu loạn khí quyển làm ảnh sao bị nhoè, đo bằng giây cung (\arcsec).
+\end{itemize}
+Các yếu tố này có đơn vị khác nhau (độ, phần trăm, giây cung) và thường \emph{mâu thuẫn}
+nhau: giờ mục tiêu lên cao nhất có thể trùng lúc trăng sáng hoặc nhiều mây. Bài toán vì vậy
+mang bản chất \textbf{tối ưu đa mục tiêu}.
+
+\paragraph{Mục tiêu dự án.}
+\begin{enumerate}[nosep]
+  \item Xây dựng pipeline tự động từ toạ độ, mục tiêu, ngày $\rightarrow$ bảng đánh giá từng giờ.
+  \item Thiết kế hàm điểm minh bạch, có thể giải thích và điều chỉnh theo nhu cầu người dùng.
+  \item Ước lượng seeing bằng học máy với quy trình kiểm định không rò rỉ thông tin tương lai.
+  \item Đánh giá độ tin cậy của khuyến nghị (Pareto, độ nhạy trọng số).
+  \item Cung cấp giao diện web dễ dùng cho thành viên CLB.
+\end{enumerate}
+
+%=====================================================================
+\section{Kiến trúc hệ thống}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=8mm and 12mm,
+  box/.style={draw, rounded corners, align=center, minimum height=9mm, inner sep=4pt, fill=blue!5},
+  arr/.style={-{Stealth}, thick}
+]
+\node[box] (astro) {Astropy\\ephemeris};
+\node[box, below=of astro] (wx) {Open-Meteo\\API};
+\node[box, right=of wx] (feat) {Đặc trưng\\thời tiết};
+\node[box, right=of feat] (rf) {Random Forest\\(seeing)};
+\node[box, right=22mm of astro] (tbl) {Bảng\\theo giờ};
+\node[box, right=of tbl] (norm) {Chuẩn hoá\\$g_i\in[0,1]$};
+\node[box, right=of norm] (S) {Điểm $S(t)$};
+\node[box, above right=4mm and 10mm of S] (win) {Cửa sổ\\tốt nhất};
+\node[box, below right=4mm and 10mm of S] (par) {Pareto,\\độ nhạy};
+\draw[arr] (astro) -- (tbl);
+\draw[arr] (wx) -- (tbl);
+\draw[arr] (wx) -- (feat);
+\draw[arr] (feat) -- (rf);
+\draw[arr] (rf) -- (norm);
+\draw[arr] (tbl) -- (norm);
+\draw[arr] (norm) -- (S);
+\draw[arr] (S) -- (win);
+\draw[arr] (S) -- (par);
+\end{tikzpicture}
+\caption{Luồng xử lý dữ liệu của SkyScore.}
+\end{figure}
+
+Mã nguồn được tổ chức thành các mô-đun độc lập (Bảng~\ref{tab:modules}), mỗi mô-đun có
+kiểm thử đơn vị bằng \texttt{pytest}.
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{>{\ttfamily}l X}
+\toprule
+\normalfont\textbf{Tệp} & \textbf{Chức năng} \\
+\midrule
+astro.py        & Độ cao mục tiêu, Mặt Trời, Mặt Trăng; pha trăng và góc tách trăng--mục tiêu \\
+weather.py      & Gọi API Open-Meteo; sinh thời tiết giả lập khi offline \\
+seeing\_model.py & Trích đặc trưng, nhãn giả lập, Random Forest, kiểm định chéo chuỗi thời gian \\
+scoring.py      & Chuẩn hoá, hàm điểm, cửa sổ tốt nhất, Pareto, độ nhạy \\
+pipeline.py     & Ghép nối các bước trên thành một lời gọi \texttt{build\_table} \\
+app.py          & Giao diện Streamlit \\
+\bottomrule
+\end{tabularx}
+\caption{Các mô-đun chính.}
+\label{tab:modules}
+\end{table}
+
+%=====================================================================
+\section{Dữ liệu}
+
+\subsection{Hình học thiên văn}
+Với vị trí quan sát $(\varphi,\lambda)$ và lưới thời gian 24 giờ (UTC), Astropy tính:
+độ cao mục tiêu $h$, độ cao Mặt Trời $h_\odot$, độ cao Mặt Trăng $h_{\text{moon}}$, góc tách
+$\theta$ giữa Mặt Trăng và mục tiêu, và phần đĩa trăng được chiếu sáng
+\begin{equation}
+k = \frac{1+\cos i}{2},
+\end{equation}
+trong đó $i$ là góc pha. Mục tiêu gồm 6 thiên thể sâu (M31, M42, M45, M13, M8, M104 --- toạ độ
+J2000) và 4 hành tinh (Sao Mộc, Sao Thổ, Sao Hoả, Sao Kim --- lịch thiên văn tích hợp của
+Astropy, không cần mạng).
+
+\subsection{Thời tiết}
+Biến theo giờ từ Open-Meteo (miễn phí, không cần khoá API): độ che phủ mây, độ ẩm tương đối,
+nhiệt độ, điểm sương, áp suất mực biển, gió 10\,m và gió ở mực 250\,hPa (dòng xiết).
+Khi không có mạng, hệ thống dùng thời tiết giả lập gồm chu kỳ ngày đêm cộng nhiễu AR(1) và
+\textbf{ghi rõ nguồn trên giao diện}.
+
+%=====================================================================
+\section{Mô hình toán học}
+
+\subsection{Chuẩn hoá tiêu chí}
+Mỗi tiêu chí được ánh xạ về \emph{độ tốt} $g_i\in[0,1]$ (1 là tốt nhất):
+\begin{align}
+g_{\text{alt}}  &= \max(0,\sin h), \label{eq:alt}\\
+g_{\text{moon}} &= 1 - k\,\ind[h_{\text{moon}}>0]\left(0{,}4 + 0{,}6\,e^{-\theta/40^\circ}\right), \label{eq:moon}\\
+g_{\text{cloud}} &= 1 - c/100, \label{eq:cloud}\\
+g_{\text{see}}  &= 1 - \operatorname{clip}\!\left(\frac{\sigma-0{,}8}{3{,}5-0{,}8},\,0,\,1\right). \label{eq:see}
+\end{align}
+Trong đó $c$ là độ che phủ mây (\%) và $\sigma$ là seeing (\arcsec).
+Biểu thức \eqref{eq:alt} xấp xỉ $1/\text{airmass}$ (với $X\approx 1/\sin h$).
+Biểu thức \eqref{eq:moon} phạt nặng nhất khi trăng tròn, đã mọc và nằm sát mục tiêu; ngay cả khi
+ở xa, trăng sáng vẫn làm sáng nền trời (hệ số nền $0{,}4$).
+
+\subsection{Hàm điểm và ràng buộc}
+\begin{equation}
+S(t) = \ind[\text{obs}(t)]\sum_{i\in\{\text{alt,moon,cloud,see}\}} w_i\,g_i(t),
+\qquad \sum_i w_i = 1,\ w_i\ge 0,
+\end{equation}
+với ràng buộc cứng
+\begin{equation}
+\text{obs}(t) \iff h_\odot(t) < -18^\circ \ \wedge\ h(t) > 15^\circ .
+\end{equation}
+Điều kiện thứ nhất là đêm thiên văn; điều kiện thứ hai loại bỏ vùng airmass lớn ($X>3{,}9$).
+Trọng số mặc định: $\bm{w} = (0{,}35;\ 0{,}20;\ 0{,}30;\ 0{,}15)$, người dùng có thể thay đổi
+và hệ thống tự chuẩn hoá về tổng bằng 1.
+
+\subsection{Cửa sổ quan sát tốt nhất}
+Với độ dài cửa sổ $L$ giờ:
+\begin{equation}
+t^\ast = \arg\max_{t}\ \frac{1}{L}\sum_{j=0}^{L-1} S(t+j).
+\end{equation}
+
+\subsection{Tập Pareto}
+Giờ $a$ \emph{trội hơn} giờ $b$ nếu $g_i(a)\ge g_i(b)\ \forall i$ và bất đẳng thức chặt ở ít
+nhất một $i$. Tập Pareto là các giờ quan sát được không bị giờ nào trội hơn. Tập này cho thấy
+sự đánh đổi giữa các tiêu chí \emph{mà không cần chọn trọng số}.
+
+\subsection{Phân tích độ nhạy trọng số}
+Trọng số là lựa chọn chủ quan. Để kiểm tra khuyến nghị có phụ thuộc vào lựa chọn đó không, ta
+lấy mẫu $n=500$ bộ trọng số $\bm{w}^{(m)}\sim\operatorname{Dirichlet}(1,1,1,1)$ (phân phối đều
+trên đơn hình) và tính tần suất thắng
+\begin{equation}
+f(t) = \frac{1}{n}\sum_{m=1}^{n}\ind\!\left[t = \arg\max_{\tau} S_{\bm{w}^{(m)}}(\tau)\right].
+\end{equation}
+$\max_t f(t)$ cao nghĩa là khuyến nghị \textbf{bền vững}.
+
+%=====================================================================
+\section{Mô hình học máy dự báo seeing}
+
+\subsection{Đặc trưng}
+Seeing chủ yếu do nhiễu loạn tầng cao (dòng xiết), gió mặt đất và biến đổi nhiệt. Bảy đặc trưng:
+\begin{itemize}[nosep]
+  \item tốc độ gió 250\,hPa, tốc độ gió 10\,m;
+  \item $|\Delta T_{3h}|$, $|\Delta p_{3h}|$ (biến thiên nhiệt độ, áp suất trong 3 giờ);
+  \item chênh lệch nhiệt độ -- điểm sương, độ ẩm tương đối, độ che phủ mây.
+\end{itemize}
+
+\subsection{Nhãn và mô hình}
+Do không có kho dữ liệu seeing đo thật miễn phí cho địa điểm cụ thể, nhãn được sinh bằng công
+thức gần đúng mang tính vật lý:
+\begin{equation}
+\sigma = \Big[0{,}7 + 0{,}012\,(v_{250}-40)^+ + 0{,}03\,v_{10} + 0{,}25\,|\Delta T_{3h}|
+ + 0{,}15\,|\Delta p_{3h}| + 0{,}004\,(RH-60)^+\Big]\cdot\varepsilon,
+\end{equation}
+với $\varepsilon\sim\operatorname{LogNormal}(0;\,0{,}08)$, sau đó cắt về $[0{,}5;\,5]\arcsec$.
+Tập huấn luyện gồm $24\times240 = 5760$ giờ thời tiết giả lập.
+
+Mô hình: \texttt{RandomForestRegressor} (200 cây, \texttt{min\_samples\_leaf}=3).
+Kiểm định: \texttt{TimeSeriesSplit} 5 lần gập --- luôn huấn luyện trên quá khứ, kiểm tra trên
+tương lai, tránh rò rỉ thông tin.
+
+\subsection{Kết quả}
+\begin{table}[h]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Chỉ số (CV chuỗi thời gian, 5 lần)} & \textbf{Giá trị} \\
+\midrule
+MAE  & $0{,}17\arcsec$ \\
+$R^2$ & $0{,}96$ \\
+\bottomrule
+\end{tabular}
+\quad
+\begin{tabular}{lc}
+\toprule
+\textbf{Đặc trưng} & \textbf{Độ quan trọng} \\
+\midrule
+Gió 250\,hPa & 0,880 \\
+$|\Delta T_{3h}|$ & 0,052 \\
+Gió 10\,m & 0,043 \\
+$|\Delta p_{3h}|$ & 0,017 \\
+Còn lại & $<0{,}01$ \\
+\bottomrule
+\end{tabular}
+\caption{Hiệu năng và độ quan trọng đặc trưng của mô hình seeing.}
+\end{table}
+
+\paragraph{Diễn giải trung thực.}
+Các con số trên chỉ cho thấy pipeline \emph{khôi phục được công thức giả lập}; chúng
+\textbf{không} phải bằng chứng về khả năng dự báo seeing thực tế. Độ quan trọng của gió
+250\,hPa ($\approx 0{,}88$) phản ánh cách xây dựng nhãn giả lập.
+
+%=====================================================================
+\section{Kết quả minh hoạ}
+
+Ví dụ: TP.\,Hồ Chí Minh ($10{,}78^\circ$N, $106{,}70^\circ$E), mục tiêu M42 (Tinh vân Lạp Hộ),
+ngày 15/01/2026 (UTC), trọng số mặc định, chế độ thời tiết giả lập, cửa sổ 3 giờ.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Kết quả} & \textbf{Giá trị} \\
+\midrule
+Số giờ quan sát được & 7 \\
+Cửa sổ tốt nhất (UTC) & 13:00 -- 16:00 \\
+Cửa sổ tốt nhất (giờ Việt Nam) & 20:00 -- 23:00 \\
+Điểm trung bình cửa sổ & 0,76 \\
+Độ bền vững giờ tốt nhất & 46\,\% \\
+Số giờ thuộc tập Pareto & 7 / 7 \\
+\bottomrule
+\end{tabular}
+\caption{Kết quả minh hoạ (dữ liệu thời tiết giả lập).}
+\end{table}
+
+Nhận xét: cả 7 giờ đều thuộc tập Pareto, nghĩa là không giờ nào tốt hơn tuyệt đối ở mọi tiêu
+chí --- đúng là có sự đánh đổi (thường giữa độ cao mục tiêu và mây). Độ bền vững 46\,\% cho thấy
+giờ tốt nhất phụ thuộc đáng kể vào trọng số, nên người dùng nên xem cả cửa sổ nhiều giờ thay vì
+một giờ duy nhất.
+
+% Gợi ý: chụp màn hình giao diện và chèn tại đây
+% \begin{figure}[h]\centering
+% \includegraphics[width=\textwidth]{screenshot_planner.png}
+% \caption{Giao diện tab Planner.}\end{figure}
+
+%=====================================================================
+\section{Giao diện người dùng}
+
+Ứng dụng Streamlit gồm thanh bên (toạ độ, mục tiêu, ngày, trọng số, độ dài cửa sổ) và ba tab:
+\begin{itemize}[nosep]
+  \item \textbf{Planner}: cửa sổ tốt nhất, điểm trung bình, độ bền vững; biểu đồ điểm, bốn tiêu
+        chí và seeing theo giờ; bảng Pareto và bảng dữ liệu thô.
+  \item \textbf{Giới thiệu}: mô tả phương pháp và lưu ý về dữ liệu.
+  \item \textbf{Hướng dẫn}: cách dùng, cách đọc kết quả, câu hỏi thường gặp.
+\end{itemize}
+
+Chạy cục bộ:
+\begin{lstlisting}[language=bash]
+pip install -r requirements.txt
+pytest                  # kiem thu don vi
+streamlit run app.py    # mo giao dien web
+\end{lstlisting}
+
+%=====================================================================
+\section{Kiểm thử}
+Bộ kiểm thử \texttt{pytest} bao gồm: tính đúng của chuẩn hoá min--max, ràng buộc quan sát
+được, điểm nằm trong $[0,1]$, cửa sổ tốt nhất, tập Pareto, độ nhạy trọng số, và chạy toàn bộ
+pipeline ở chế độ offline.
+
+%=====================================================================
+\section{Hạn chế và hướng phát triển}
+\begin{enumerate}[nosep]
+  \item \textbf{Nhãn seeing thật}: thay nhãn giả lập bằng nhật ký quan sát của CLB (ước lượng
+        seeing qua tách sao đôi hoặc FWHM sao trên ảnh), ghép với thời tiết lưu trữ cùng giờ,
+        và so sánh với mô hình cơ sở (persistence / climatology).
+  \item \textbf{Ô nhiễm ánh sáng}: thêm tiêu chí thứ năm theo thang Bortle hoặc dữ liệu vệ tinh VIIRS.
+  \item \textbf{Hiệu chỉnh trọng số}: học trọng số từ đánh giá chủ quan của thành viên sau mỗi buổi quan sát.
+  \item \textbf{Múi giờ địa phương}: hiển thị trực tiếp giờ địa phương thay vì UTC.
+\end{enumerate}
+
+%=====================================================================
+\section{Kết luận}
+SkyScore là công cụ lập kế hoạch quan sát minh bạch, kết hợp tính toán thiên văn, dự báo thời
+tiết và học máy. Thay vì chỉ đưa ra một con số, hệ thống còn cho biết \emph{vì sao} (bốn tiêu
+chí), \emph{có đánh đổi gì} (Pareto) và \emph{chắc chắn đến đâu} (độ nhạy trọng số). Bước quan
+trọng nhất tiếp theo là thu thập dữ liệu seeing thật để mô hình học máy có giá trị khoa học.
+
+%=====================================================================
+\begin{thebibliography}{9}
+\bibitem{astropy} Astropy Collaboration (2022). \emph{The Astropy Project: Sustaining and
+  Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the
+  Core Package}. The Astrophysical Journal, 935(2), 167.
+\bibitem{openmeteo} Open-Meteo. \emph{Free Weather API}. \url{https://open-meteo.com/}
+\bibitem{sklearn} Pedregosa, F.\ et al.\ (2011). \emph{Scikit-learn: Machine Learning in
+  Python}. Journal of Machine Learning Research, 12, 2825--2830.
+\bibitem{breiman} Breiman, L.\ (2001). \emph{Random Forests}. Machine Learning, 45(1), 5--32.
+\bibitem{coulman} Coulman, C.\,E.\ (1985). \emph{Fundamental and Applied Aspects of
+  Astronomical Seeing}. Annual Review of Astronomy and Astrophysics, 23, 19--57.
+\bibitem{streamlit} Streamlit. \url{https://streamlit.io/}
+\end{thebibliography}
+
+\end{document}
