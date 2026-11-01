@@ -251,7 +251,7 @@ with st.sidebar:
     lat = st.number_input(T["lat"], -90.0, 90.0, 10.78, 0.01, key="lat")
     lon = st.number_input(T["lon"], -180.0, 180.0, 106.70, 0.01, key="lon")
     target = st.selectbox(T["target"], TARGETS, key="target")
-    date = st.date_input(T["date"], pd.Timestamp.utcnow().date(), key="date")
+    date = st.date_input(T["date"], pd.Timestamp.now("UTC").date(), key="date")
     offline = st.checkbox(T["offline"], value=False, key="offline")
 
     st.header(T["weights"])
