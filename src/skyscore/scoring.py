@@ -58,10 +58,9 @@ def add_components(df: pd.DataFrame) -> pd.DataFrame:
     moon_up = (out["moon_alt"] > 0).astype(float)
     proximity = np.exp(-out["moon_sep"] / 40.0)
     limit = out["sun_limit"] if "sun_limit" in out else SUN_LIMIT_DEG
-    # The Moon does not brighten the daytime sky, so it cannot hurt a daytime target (the Sun).
-    out["g_moon"] = np.where(
-        np.asarray(limit) > 0, 1.0, 1.0 - out["moon_illum"] * moon_up * (0.4 + 0.6 * proximity)
-    )
+    matters = out["moon_matters"] if "moon_matters" in out else True
+    # Moonlight cannot hurt the Sun (daytime) or the Moon itself.
+    out["g_moon"] = np.where(matters, 1.0 - out["moon_illum"] * moon_up * (0.4 + 0.6 * proximity), 1.0)
     out["g_cloud"] = minmax(out["cloud_cover"], 0, 100, invert=True)
     out["g_seeing"] = minmax(out["seeing_arcsec"], SEEING_BEST, SEEING_WORST, invert=True)
     out["observable"] = (out["sun_alt"] < limit) & (out["target_alt"] > MIN_ALT_DEG)

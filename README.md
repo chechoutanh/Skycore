@@ -31,7 +31,7 @@ $$
 S(t) \;=\; \mathbb{1}\!\left[\text{observable}(t)\right]\sum_{i} w_i\, g_i(t), \qquad \sum_i w_i = 1,\; w_i \ge 0,
 $$
 
-with hard constraints: target altitude $> 15^\circ$ and the Sun below a target-dependent limit: $-18^\circ$ (astronomical night) for deep-sky objects, $-12^\circ$ for naked-eye constellations, $-6^\circ$ for bright planets. The Sun is a daytime target, so its Moon term is fixed at 1.
+with hard constraints: target altitude $> 15^\circ$ and the Sun below a target-dependent limit: $-18^\circ$ (astronomical night) for deep-sky objects, $-12^\circ$ for naked-eye constellations, $-6^\circ$ for bright planets. The Sun is a daytime target. For the Sun and the Moon the Moon term is fixed at 1. The moons of Jupiter and Saturn use their planet's position (they stay within 0.2° of it).
 
 This is equivalent to the penalty form $S = w_1 A - w_2 M - w_3 C + \text{const}$, written so that every term is "higher is better".
 

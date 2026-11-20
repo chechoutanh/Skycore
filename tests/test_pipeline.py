@@ -49,3 +49,12 @@ def test_every_target_has_geometry():
     for name in TARGETS:
         t = sky_table(10.78, 106.70, name, times)
         assert t["target_alt"].between(-90, 90).all(), name
+
+
+def test_moon_target_is_not_penalised_by_itself():
+    X, y = simulated_training_set(hours=24 * 30)
+    model = SeeingModel(n_estimators=20).fit(X, y)
+    # 2026-01-03 is a full Moon: it is up all night.
+    df, _ = build_table(10.78, 106.70, "Moon", pd.Timestamp("2026-01-03"), offline=True, model=model)
+    assert df["observable"].sum() >= 6
+    assert (df["g_moon"] == 1.0).all()

@@ -41,27 +41,37 @@ CONSTELLATIONS = {
     "Taurus (constellation)": (68.0, 18.0),
     "Gemini (constellation)": (108.0, 24.0),
 }
-SOLAR_SYSTEM = ["Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Sun"]
-TARGETS = list(DEEP_SKY) + SOLAR_SYSTEM + list(CONSTELLATIONS)
+SOLAR_SYSTEM = ["Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Sun"]
+# A planet's moons stay within ~0.2 deg of it, so planning uses the planet's position.
+PLANET_MOONS = {
+    "Jupiter's moons (Io, Europa, Ganymede, Callisto)": "Jupiter",
+    "Saturn's moons (Titan, Rhea, ...)": "Saturn",
+}
+TARGETS = list(DEEP_SKY) + SOLAR_SYSTEM + list(PLANET_MOONS) + list(CONSTELLATIONS)
 
 
 def sun_limit(name: str) -> float:
     """Highest Sun altitude (deg) at which the target can be observed."""
     if name == "Sun":
         return 90.0  # daytime target: no darkness needed
-    if name in ("Mercury", "Venus", "Mars", "Jupiter", "Saturn"):
-        return -6.0  # bright planets: visible from the end of civil twilight
-    if name in CONSTELLATIONS:
-        return -12.0  # naked-eye star patterns: nautical twilight is dark enough
+    if name in ("Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Jupiter's moons (Io, Europa, Ganymede, Callisto)"):
+        return -6.0  # bright targets: visible from the end of civil twilight
+    if name in CONSTELLATIONS or name == "Saturn's moons (Titan, Rhea, ...)":
+        return -12.0  # naked-eye star patterns and Titan (mag ~8): nautical twilight is dark enough
     return -18.0  # faint targets need astronomical night
+
+
+def moon_matters(name: str) -> bool:
+    """False when moonlight cannot hurt the target: the Sun (daytime) and the Moon itself."""
+    return name not in ("Sun", "Moon")
 
 
 def _target_coord(name: str, t: Time, loc: EarthLocation):
     if name in DEEP_SKY or name in CONSTELLATIONS:
         ra, dec = DEEP_SKY.get(name) or CONSTELLATIONS[name]
         return SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
-    if name in SOLAR_SYSTEM:
-        return get_body(name.lower(), t, loc)
+    if name in SOLAR_SYSTEM or name in PLANET_MOONS:
+        return get_body(PLANET_MOONS.get(name, name).lower(), t, loc)
     raise KeyError(f"Unknown target: {name!r}")
 
 
@@ -88,7 +98,8 @@ def sky_table(
     """Return target/Sun/Moon geometry for each timestamp.
 
     Columns: target_alt, sun_alt, moon_alt, moon_illum, moon_sep (degrees,
-    illumination in [0, 1]) and sun_limit (darkness the target needs, degrees).
+    illumination in [0, 1]), sun_limit (darkness the target needs, degrees) and
+    moon_matters (whether moonlight counts against the target).
     """
     loc = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=elevation_m * u.m)
     t = Time(times.values)
@@ -110,6 +121,7 @@ def sky_table(
             "moon_illum": moon_illumination(t, loc),
             "moon_sep": np.asarray(sep),
             "sun_limit": sun_limit(target),
+            "moon_matters": moon_matters(target),
         },
         index=times,
     )

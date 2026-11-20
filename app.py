@@ -61,7 +61,7 @@ $$S(t) = \mathbb{1}[\text{observable}(t)]\sum_i w_i\,g_i(t), \qquad \sum_i w_i =
 
 An hour counts as *observable* only when the target is above 15° and the sky is dark enough for it:
 Sun below −18° for galaxies, nebulae and clusters, −12° for naked-eye constellations, −6° for bright planets.
-The Sun itself is a daytime target, so the Moon does not count against it.
+The Sun itself is a daytime target. Moonlight does not count against the Sun or the Moon.
 
 Besides the total score, the app also reports:
 
@@ -95,7 +95,7 @@ $$S(t) = \mathbb{1}[\text{quan sát được}(t)]\sum_i w_i\,g_i(t), \qquad \sum
 
 Một giờ chỉ được tính là *quan sát được* khi mục tiêu cao hơn 15° và trời đủ tối cho mục tiêu đó:
 Mặt Trời thấp hơn −18° với thiên hà, tinh vân, cụm sao; −12° với chòm sao nhìn bằng mắt thường; −6° với hành tinh sáng.
-Bản thân Mặt Trời là mục tiêu ban ngày, nên Mặt Trăng không bị tính là bất lợi.
+Bản thân Mặt Trời là mục tiêu ban ngày. Ánh trăng không bị tính là bất lợi khi mục tiêu là Mặt Trời hoặc Mặt Trăng.
 
 Ngoài điểm tổng, ứng dụng còn đưa ra:
 
@@ -115,7 +115,7 @@ GUIDE_EN = """
 
 * **Latitude / Longitude**: your observing site. Default is Ho Chi Minh City (10.78°, 106.70°).
   Right-click a spot on Google Maps to copy its coordinates.
-* **Target**: the object to observe: 6 deep-sky objects, 7 planets, the Sun and 10 well-known constellations.
+* **Target**: the object to observe: 6 deep-sky objects, the Moon, 7 planets, the moons of Jupiter and Saturn, the Sun and 10 well-known constellations. A planet's moons stay within 0.2° of it, so they use the planet's position.
 * **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon (from midnight for the Sun); times are shown in local time (see *UTC offset*).
 * **UTC offset (h)**: your time zone, e.g. 7 for Vietnam, −5 for New York (winter).
 * **Offline demo**: use when there is no internet; the app then uses *synthetic* weather and says so.
@@ -157,7 +157,7 @@ GUIDE_VI = """
 
 * **Vĩ độ / Kinh độ**: toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh (10.78°, 106.70°).
   Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps.
-* **Mục tiêu**: thiên thể muốn quan sát: 6 thiên thể sâu, 7 hành tinh, Mặt Trời và 10 chòm sao phổ biến.
+* **Mục tiêu**: thiên thể muốn quan sát: 6 thiên thể sâu, Mặt Trăng, 7 hành tinh, các vệ tinh của Sao Mộc và Sao Thổ, Mặt Trời và 10 chòm sao phổ biến. Vệ tinh luôn ở cách hành tinh dưới 0,2°, nên dùng vị trí của hành tinh.
 * **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương (từ nửa đêm nếu mục tiêu là Mặt Trời); mọi giờ hiển thị theo giờ địa phương (xem *Múi giờ*).
 * **Múi giờ (UTC+)**: ví dụ 7 cho Việt Nam, −5 cho New York (mùa đông).
 * **Chế độ offline**: bật khi không có mạng; ứng dụng dùng thời tiết *giả lập* và ghi rõ trên giao diện.
