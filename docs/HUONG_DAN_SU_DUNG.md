@@ -29,7 +29,7 @@ pytest
 |---|---|
 | Latitude / Longitude | Toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh. Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps. |
 | Target | Thiên thể muốn quan sát: M31, M42, M45, M13, M8, M104, Sao Mộc, Sao Thổ, Sao Hoả, Sao Kim. |
-| Date (UTC) | Ngày tính theo giờ UTC. Ứng dụng tính 24 giờ, từ 00:00 đến 23:00 UTC. |
+| Date (evening) | Ngày địa phương của buổi tối định quan sát. Ứng dụng tính 24 giờ từ trưa địa phương; mọi giờ hiển thị theo UTC. |
 | Offline demo | Bật khi không có mạng. Thời tiết sẽ là dữ liệu **giả lập**. |
 
 ### Bước 2: Chỉnh trọng số

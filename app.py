@@ -95,7 +95,7 @@ GUIDE_EN = """
 * **Latitude / Longitude**: your observing site. Default is Ho Chi Minh City (10.78°, 106.70°).
   Right-click a spot on Google Maps to copy its coordinates.
 * **Target**: the object to observe (6 deep-sky objects + 4 planets).
-* **Date (UTC)**: the date in UTC. The grid covers 24 hours, 00:00–23:00 UTC.
+* **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon; all times are shown in UTC.
 * **Offline demo**: use when there is no internet; the app then uses *synthetic* weather and says so.
 
 **2. Adjust the weights**
@@ -137,7 +137,7 @@ GUIDE_VI = """
 * **Vĩ độ / Kinh độ**: toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh (10.78°, 106.70°).
   Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps.
 * **Mục tiêu**: thiên thể muốn quan sát (6 thiên thể sâu + 4 hành tinh).
-* **Ngày (UTC)**: ngày tính theo giờ UTC. Lưới tính toán là 24 giờ, từ 00:00 đến 23:00 UTC.
+* **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương; mọi giờ hiển thị theo UTC.
 * **Chế độ offline**: bật khi không có mạng; ứng dụng dùng thời tiết *giả lập* và ghi rõ trên giao diện.
 
 **2. Điều chỉnh trọng số**
@@ -178,7 +178,7 @@ TEXT = {
         "lat": "Latitude (°)",
         "lon": "Longitude (°)",
         "target": "Target",
-        "date": "Date (UTC)",
+        "date": "Date (evening)",
         "offline": "Offline demo (synthetic weather)",
         "weights": "Weights",
         "w_alt": "Altitude",
@@ -210,7 +210,7 @@ TEXT = {
         "lat": "Vĩ độ (°)",
         "lon": "Kinh độ (°)",
         "target": "Mục tiêu",
-        "date": "Ngày (UTC)",
+        "date": "Ngày (buổi tối)",
         "offline": "Chế độ offline (thời tiết giả lập)",
         "weights": "Trọng số",
         "w_alt": "Độ cao",
@@ -251,7 +251,7 @@ with st.sidebar:
     lat = st.number_input(T["lat"], -90.0, 90.0, 10.78, 0.01, key="lat")
     lon = st.number_input(T["lon"], -180.0, 180.0, 106.70, 0.01, key="lon")
     target = st.selectbox(T["target"], TARGETS, key="target")
-    date = st.date_input(T["date"], pd.Timestamp.now("UTC").date(), key="date")
+    date = st.date_input(T["date"], pd.Timestamp.now().date(), key="date")
     offline = st.checkbox(T["offline"], value=False, key="offline")
 
     st.header(T["weights"])

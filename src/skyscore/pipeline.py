@@ -10,9 +10,10 @@ from .seeing_model import SeeingModel, make_features, train_default
 from .weather import get_forecast
 
 
-def night_grid(date: pd.Timestamp, hours: int = 24) -> pd.DatetimeIndex:
-    """Hourly UTC grid starting at 00:00 UTC of ``date``."""
-    return pd.date_range(pd.Timestamp(date).normalize(), periods=hours, freq="h")
+def night_grid(date: pd.Timestamp, lon: float, hours: int = 24) -> pd.DatetimeIndex:
+    """Hourly UTC grid from local solar noon of ``date`` (local calendar date), so it covers that evening's night anywhere on Earth."""
+    noon_utc = pd.Timestamp(date).normalize() + pd.Timedelta(hours=round(12 - lon / 15))
+    return pd.date_range(noon_utc, periods=hours, freq="h")
 
 
 def build_table(
@@ -25,7 +26,7 @@ def build_table(
     model: SeeingModel | None = None,
     hours: int = 24,
 ) -> tuple[pd.DataFrame, dict]:
-    times = night_grid(date, hours)
+    times = night_grid(date, lon, hours)
     sky = sky_table(lat, lon, target, times)
     weather, source = get_forecast(lat, lon, times, offline=offline)
     model = model or train_default()

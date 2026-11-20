@@ -15,3 +15,10 @@ def test_pipeline_offline_runs():
     assert df["score"].between(0, 1).all()
     assert "Synthetic" in meta["weather_source"]
     assert df["observable"].any()
+
+
+def test_night_grid_covers_local_night_anywhere():
+    from skyscore.pipeline import night_grid
+
+    for lon, local_midnight_utc in [(106.7, "2026-01-15 17:00"), (-75.0, "2026-01-16 05:00")]:
+        assert pd.Timestamp(local_midnight_utc) in night_grid(pd.Timestamp("2026-01-15"), lon)

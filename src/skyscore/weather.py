@@ -7,6 +7,8 @@ import pandas as pd
 import requests
 
 URL = "https://api.open-meteo.com/v1/forecast"
+# Archived past forecasts (2022+): what the model *would have seen* before a past event.
+HISTORICAL_URL = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 HOURLY_VARS = [
     "cloud_cover",
     "relative_humidity_2m",
@@ -19,17 +21,25 @@ HOURLY_VARS = [
 COLUMNS = HOURLY_VARS
 
 
-def fetch_open_meteo(lat: float, lon: float, days: int = 3, timeout: float = 10.0) -> pd.DataFrame:
-    """Hourly forecast (UTC) from the free Open-Meteo API."""
+def fetch_open_meteo(
+    lat: float,
+    lon: float,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    historical: bool = False,
+    timeout: float = 10.0,
+) -> pd.DataFrame:
+    """Hourly forecast (UTC) from the free Open-Meteo API for ``start``..``end`` (dates, inclusive)."""
     params = {
         "latitude": lat,
         "longitude": lon,
         "hourly": ",".join(HOURLY_VARS),
-        "forecast_days": days,
+        "start_date": f"{start:%Y-%m-%d}",
+        "end_date": f"{end:%Y-%m-%d}",
         "timezone": "GMT",
         "wind_speed_unit": "kmh",
     }
-    r = requests.get(URL, params=params, timeout=timeout)
+    r = requests.get(HISTORICAL_URL if historical else URL, params=params, timeout=timeout)
     r.raise_for_status()
     h = r.json()["hourly"]
     df = pd.DataFrame(h)
@@ -88,11 +98,14 @@ def get_forecast(
 ) -> tuple[pd.DataFrame, str]:
     """Weather aligned to ``times``. Returns (frame, source_label)."""
     if not offline:
+        # Past nights come from the forecast archive, so evaluation uses forecasts, not hindsight.
+        historical = times[-1] < pd.Timestamp.now("UTC").tz_localize(None) - pd.Timedelta(days=1)
         try:
-            raw = fetch_open_meteo(lat, lon, days=4)
+            raw = fetch_open_meteo(lat, lon, times[0], times[-1], historical=historical)
             out = raw.reindex(times).interpolate(limit_direction="both")
             if out.notna().all().all():
-                return out, "Open-Meteo (live forecast)"
+                label = "archived forecast" if historical else "live forecast"
+                return out, f"Open-Meteo ({label})"
         except Exception:  # network down, API change, etc.
             pass
     syn = synthetic_weather(lat, times[0] - pd.Timedelta(hours=6), len(times) + 12, seed=42)
