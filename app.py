@@ -32,7 +32,7 @@ def night_chart(df: pd.DataFrame, cols: list[str], labels: list[str]):
         .mark_line(point=True)
         .encode(
             x=x,
-            y=alt.Y("value:Q", title=None),
+            y=alt.Y("value:Q", title=None, axis=alt.Axis(format=".2~f")),
             color=alt.Color("series:N", title=None, scale=alt.Scale(scheme="category10"), legend=alt.Legend(orient="bottom")),
             tooltip=["time", "series", alt.Tooltip("value:Q", format=".2f")],
         )
@@ -116,7 +116,7 @@ GUIDE_EN = """
 * **Latitude / Longitude**: your observing site. Default is Ho Chi Minh City (10.78°, 106.70°).
   Right-click a spot on Google Maps to copy its coordinates.
 * **Target**: the object to observe: 6 deep-sky objects, 7 planets, the Sun and 10 well-known constellations.
-* **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon; times are shown in local time (see *UTC offset*).
+* **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon (from midnight for the Sun); times are shown in local time (see *UTC offset*).
 * **UTC offset (h)**: your time zone, e.g. 7 for Vietnam, −5 for New York (winter).
 * **Offline demo**: use when there is no internet; the app then uses *synthetic* weather and says so.
 
@@ -158,7 +158,7 @@ GUIDE_VI = """
 * **Vĩ độ / Kinh độ**: toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh (10.78°, 106.70°).
   Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps.
 * **Mục tiêu**: thiên thể muốn quan sát: 6 thiên thể sâu, 7 hành tinh, Mặt Trời và 10 chòm sao phổ biến.
-* **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương; mọi giờ hiển thị theo giờ địa phương (xem *Múi giờ*).
+* **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương (từ nửa đêm nếu mục tiêu là Mặt Trời); mọi giờ hiển thị theo giờ địa phương (xem *Múi giờ*).
 * **Múi giờ (UTC+)**: ví dụ 7 cho Việt Nam, −5 cho New York (mùa đông).
 * **Chế độ offline**: bật khi không có mạng; ứng dụng dùng thời tiết *giả lập* và ghi rõ trên giao diện.
 
@@ -217,7 +217,7 @@ TEXT = {
         "mean": "Mean score",
         "robust": "Robustness of best hour",
         "robust_help": "Share of random weight sets that pick the same best hour",
-        "never": "Target never observable tonight (twilight / too low).",
+        "never": "Target not observable on this date (sky not dark enough / target too low).",
         "sun_warning": "Never look at the Sun through a telescope, binoculars or with the naked eye without a certified solar filter.",
         "score_time": "Score over time",
         "criteria": "Criteria (0 = bad, 1 = good)",
@@ -251,7 +251,7 @@ TEXT = {
         "mean": "Điểm trung bình",
         "robust": "Độ bền vững của giờ tốt nhất",
         "robust_help": "Tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất",
-        "never": "Mục tiêu không quan sát được đêm nay (trời chưa đủ tối / mục tiêu quá thấp).",
+        "never": "Mục tiêu không quan sát được vào ngày này (trời chưa đủ tối / mục tiêu quá thấp).",
         "sun_warning": "Tuyệt đối không nhìn Mặt Trời qua kính thiên văn, ống nhòm hay bằng mắt thường nếu không có kính lọc Mặt Trời đạt chuẩn.",
         "score_time": "Điểm theo thời gian",
         "criteria": "Các tiêu chí (0 = xấu, 1 = tốt)",

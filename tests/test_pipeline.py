@@ -38,6 +38,8 @@ def test_sun_is_a_daytime_target():
     obs = df[df["observable"]]
     assert len(obs) > 0 and (obs["sun_alt"] > 15).all()
     assert (df["g_moon"] == 1.0).all()
+    # The grid covers the chosen day (local midnight to midnight), not the next morning.
+    assert df.index[0] == pd.Timestamp("2026-01-14 17:00")
 
 
 def test_every_target_has_geometry():

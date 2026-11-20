@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .astro import sky_table
+from .astro import sky_table, sun_limit
 from .scoring import Weights, score
 from .seeing_model import SeeingModel, make_features, train_default
 from .weather import get_forecast
 
 
-def night_grid(date: pd.Timestamp, lon: float, hours: int = 24) -> pd.DatetimeIndex:
-    """Hourly UTC grid from local solar noon of ``date`` (local calendar date), so it covers that evening's night anywhere on Earth."""
-    noon_utc = pd.Timestamp(date).normalize() + pd.Timedelta(hours=round(12 - lon / 15))
-    return pd.date_range(noon_utc, periods=hours, freq="h")
+def night_grid(date: pd.Timestamp, lon: float, hours: int = 24, start_hour: int = 12) -> pd.DatetimeIndex:
+    """Hourly UTC grid from local solar ``start_hour`` of ``date``.
+
+    The default (noon) covers that evening's night anywhere on Earth; 0 covers the daytime.
+    """
+    start_utc = pd.Timestamp(date).normalize() + pd.Timedelta(hours=round(start_hour - lon / 15))
+    return pd.date_range(start_utc, periods=hours, freq="h")
 
 
 def build_table(
@@ -26,7 +29,8 @@ def build_table(
     model: SeeingModel | None = None,
     hours: int = 24,
 ) -> tuple[pd.DataFrame, dict]:
-    times = night_grid(date, lon, hours)
+    daytime = sun_limit(target) > 0  # the Sun: plan the day of `date`, not its night
+    times = night_grid(date, lon, hours, start_hour=0 if daytime else 12)
     sky = sky_table(lat, lon, target, times)
     weather, source = get_forecast(lat, lon, times, offline=offline)
     model = model or train_default()
