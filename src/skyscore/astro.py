@@ -10,6 +10,13 @@ import pandas as pd
 import astropy.units as u
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, get_sun
 from astropy.time import Time
+from astropy.utils import iers
+
+# Planning needs ~arcminute accuracy, so the bundled IERS table is enough; downloading
+# it at runtime crashed the app whenever the IERS server or SSL was unavailable.
+iers.conf.auto_download = False
+iers.conf.auto_max_age = None
+iers.conf.iers_degraded_accuracy = "warn"
 
 # Deep-sky targets: (RA deg, Dec deg), J2000. Solar-system bodies are computed
 # from the built-in ephemeris, so everything works without network access.

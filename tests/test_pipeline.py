@@ -22,3 +22,10 @@ def test_night_grid_covers_local_night_anywhere():
 
     for lon, local_midnight_utc in [(106.7, "2026-01-15 17:00"), (-75.0, "2026-01-16 05:00")]:
         assert pd.Timestamp(local_midnight_utc) in night_grid(pd.Timestamp("2026-01-15"), lon)
+
+
+def test_sky_table_far_future_works_offline():
+    from skyscore.astro import sky_table
+
+    t = sky_table(10.78, 106.70, "M31 (Andromeda Galaxy)", pd.date_range("2028-06-01", periods=2, freq="h"))
+    assert t.notna().all().all()
