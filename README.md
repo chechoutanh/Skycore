@@ -3,6 +3,8 @@
 SkyScore answers one practical question every astronomy club asks: **"When tonight should we point the telescope at this target?"**
 It combines celestial mechanics (Astropy), live weather forecasts (Open-Meteo), a machine-learning estimate of atmospheric *seeing*, and a transparent multi-objective scoring function, then presents the result in a Streamlit dashboard.
 
+> **Project history.** Development started in [TODO: month/year]. The original repository was lost, so this repository is a rebuilt version; its commit history starts in November 2026.
+
 ## Pipeline
 
 ```
@@ -54,7 +56,34 @@ Long-term *measured* seeing archives for a specific site are not freely availabl
 
 These numbers only show that the pipeline can recover the proxy; they are **not** evidence of real-world forecasting skill. The default feature importance (250 hPa wind ≈ 0.88) reflects the proxy's construction.
 
+### Evaluation on real observing logs
+
+[TODO: fill in after running the evaluation.] Measured seeing, cloud and observing quality from real club events are kept in [`data/`](data/README.md). For each logged hour, `skyscore.evaluation` rebuilds the forecast SkyScore would have made **before** the event (Open-Meteo forecast archive, not hindsight) and compares it with what was measured:
+
+```bash
+python -m skyscore.evaluation data/events.csv data/observations.csv
+```
+
+| Metric | SkyScore | Baseline |
+|---|---|---|
+| Seeing rank correlation (Spearman) | [TODO] | 0 (no skill) |
+| Seeing MAE, FWHM hours (″) | [TODO] | [TODO] (climatology) |
+| Cloud MAE (%) | [TODO] | [TODO] (climatology) |
+| Observing rating at the recommended hour (1–5) | [TODO] | [TODO] (random logged hour) |
+
+The baseline is climatology (always predict the average) because measurements of the same night are not available when the plan is made.
+
 **To make the model scientifically meaningful**, replace the labels with real measurements, for example the club's own observing logs (estimated seeing from double-star splitting or star FWHM in images), merged with archived weather for the same hours, and call `SeeingModel.fit(X, y, label_source="club logs")`. With real labels, report the CV error against a persistence/climatology baseline.
+
+## Real-world use
+
+[TODO: confirm details.] SkyScore has been used by 2 astronomy clubs to plan 10 observing events:
+
+| Club | Since | Members | Events |
+|---|---|---|---|
+| [TODO] | [TODO] | [TODO] | [TODO] |
+
+Event-by-event details are in [`data/events.csv`](data/events.csv).
 
 ## Quick start
 
@@ -81,6 +110,8 @@ src/skyscore/weather.py     Open-Meteo client + synthetic fallback
 src/skyscore/seeing_model.py  Features, proxy labels, Random Forest, time-series CV
 src/skyscore/scoring.py     Normalization, score S, best window, Pareto, sensitivity
 src/skyscore/pipeline.py    Glue code
+src/skyscore/evaluation.py  Compare predictions with real observing logs
+data/                       Observing logs from club events (see data/README.md)
 tests/                      pytest suite
 docs/                       user guide, deploy guide, LaTeX report
 ```
@@ -89,9 +120,13 @@ docs/                       user guide, deploy guide, LaTeX report
 
 * Light pollution (Bortle class) is not modeled yet; a site-specific constant or a VIIRS-based term could be added as a fifth criterion.
 * Solar-system targets use Astropy's built-in ephemeris (accurate to a few arcminutes, fine for planning).
-* Next steps: real seeing labels, calibration against actual club sessions, and a baseline comparison.
+* Next steps: retrain the seeing model on the real logs once enough hours are collected, with leave-one-event-out validation.
 
 ## Data sources
 
 * Weather: [Open-Meteo](https://open-meteo.com/) (free, no API key).
 * Ephemerides: [Astropy](https://www.astropy.org/).
+
+## Acknowledgements
+
+[TODO: only with the advisor's permission] Advised by Dr. [Name], [title, institution].
