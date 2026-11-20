@@ -29,7 +29,8 @@ pytest
 |---|---|
 | Latitude / Longitude | Toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh. Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps. |
 | Target | Thiên thể muốn quan sát: M31, M42, M45, M13, M8, M104, Sao Mộc, Sao Thổ, Sao Hoả, Sao Kim. |
-| Date (evening) | Ngày địa phương của buổi tối định quan sát. Ứng dụng tính 24 giờ từ trưa địa phương; mọi giờ hiển thị theo UTC. |
+| Date (evening) | Ngày địa phương của buổi tối định quan sát. Ứng dụng tính 24 giờ từ trưa địa phương; mọi giờ hiển thị theo giờ địa phương. |
+| UTC offset (h) | Múi giờ, ví dụ 7 cho Việt Nam. |
 | Offline demo | Bật khi không có mạng. Thời tiết sẽ là dữ liệu **giả lập**. |
 
 ### Bước 2: Chỉnh trọng số
@@ -48,7 +49,7 @@ Mỗi thanh trượt cho biết tiêu chí đó quan trọng thế nào với b�
 
 | Mục | Cách hiểu |
 |---|---|
-| Best window (UTC) | Khung giờ nên quan sát. **Giờ Việt Nam = UTC + 7** (13:00 UTC = 20:00 tối). |
+| Best window (local time) | Khung giờ nên quan sát, theo giờ địa phương. Vùng tô xám trên biểu đồ là giờ không quan sát được. |
 | Mean score | Điểm trung bình khung giờ, từ 0 đến 1. Trên khoảng 0.7 là tốt. |
 | Robustness of best hour | Tỉ lệ trong 500 bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất. Cao = chắc chắn. |
 | Score over time | Điểm theo giờ. Bằng 0 khi trời chưa tối hẳn hoặc mục tiêu thấp hơn 15°. |

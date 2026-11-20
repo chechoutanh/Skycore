@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -19,6 +20,24 @@ st.set_page_config(page_title="SkyScore", page_icon="🔭", layout="wide")
 @st.cache_resource
 def get_model():
     return train_default()
+
+
+def night_chart(df: pd.DataFrame, cols: list[str], labels: list[str]):
+    """Hourly lines on local-time labels; hours that are not observable are shaded grey."""
+    d = df[cols].reset_index(drop=True).assign(time=labels, observable=df["observable"].to_numpy())
+    x = alt.X("time:N", sort=labels, title=None, axis=alt.Axis(labelAngle=0, values=labels[::2]))
+    shade = alt.Chart(d[~d["observable"]]).mark_rect(color="gray", opacity=0.15).encode(x=x)
+    lines = (
+        alt.Chart(d.melt(["time", "observable"], cols, "series", "value"))
+        .mark_line(point=True)
+        .encode(
+            x=x,
+            y=alt.Y("value:Q", title=None),
+            color=alt.Color("series:N", title=None, scale=alt.Scale(scheme="category10"), legend=alt.Legend(orient="bottom")),
+            tooltip=["time", "series", alt.Tooltip("value:Q", format=".2f")],
+        )
+    )
+    return (shade + lines).properties(height=280)
 
 
 INTRO_EN = r"""
@@ -95,7 +114,8 @@ GUIDE_EN = """
 * **Latitude / Longitude**: your observing site. Default is Ho Chi Minh City (10.78°, 106.70°).
   Right-click a spot on Google Maps to copy its coordinates.
 * **Target**: the object to observe (6 deep-sky objects + 4 planets).
-* **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon; all times are shown in UTC.
+* **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon; times are shown in local time (see *UTC offset*).
+* **UTC offset (h)**: your time zone, e.g. 7 for Vietnam, −5 for New York (winter).
 * **Offline demo**: use when there is no internet; the app then uses *synthetic* weather and says so.
 
 **2. Adjust the weights**
@@ -113,8 +133,7 @@ the app normalizes them. Examples:
 
 **3. Read the results (🔭 Planner tab)**
 
-* **Best window (UTC)**: when to observe. **Vietnam time = UTC + 7**
-  (e.g. 13:00 UTC = 8 pm).
+* **Best window**: when to observe, in local time. Grey bands on the charts are hours when the target is not observable.
 * **Mean score**: mean score of that window (0–1). Above ~0.7 is good.
 * **Robustness**: share of random weight sets that pick the same best hour. Higher means more certain.
 * **Score over time**: zero for hours that are not observable (sky too bright or target too low).
@@ -137,7 +156,8 @@ GUIDE_VI = """
 * **Vĩ độ / Kinh độ**: toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh (10.78°, 106.70°).
   Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps.
 * **Mục tiêu**: thiên thể muốn quan sát (6 thiên thể sâu + 4 hành tinh).
-* **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương; mọi giờ hiển thị theo UTC.
+* **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương; mọi giờ hiển thị theo giờ địa phương (xem *Múi giờ*).
+* **Múi giờ (UTC+)**: ví dụ 7 cho Việt Nam, −5 cho New York (mùa đông).
 * **Chế độ offline**: bật khi không có mạng; ứng dụng dùng thời tiết *giả lập* và ghi rõ trên giao diện.
 
 **2. Điều chỉnh trọng số**
@@ -155,8 +175,7 @@ Kéo các thanh trượt để nói cho SkyScore biết điều gì quan trọng
 
 **3. Đọc kết quả (tab 🔭 Lập lịch)**
 
-* **Cửa sổ tốt nhất (UTC)**: khung giờ nên quan sát. **Giờ Việt Nam = UTC + 7**
-  (ví dụ 13:00 UTC = 20:00 tối).
+* **Cửa sổ tốt nhất**: khung giờ nên quan sát, theo giờ địa phương. Vùng tô xám trên biểu đồ là những giờ không quan sát được.
 * **Điểm trung bình**: điểm trung bình của khung giờ đó (0–1). Trên ~0.7 là tốt.
 * **Độ bền vững**: tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất. Càng cao càng chắc chắn.
 * **Điểm theo thời gian**: điểm bằng 0 ở những giờ không quan sát được (trời sáng hoặc mục tiêu quá thấp).
@@ -191,7 +210,8 @@ TEXT = {
         "guide": GUIDE_EN,
         "zero_weights": "Set at least one weight above 0.",
         "computing": "Computing…",
-        "best": "Best window (UTC)",
+        "best": "Best window (local time)",
+        "tz": "UTC offset (h)",
         "mean": "Mean score",
         "robust": "Robustness of best hour",
         "robust_help": "Share of random weight sets that pick the same best hour",
@@ -223,7 +243,8 @@ TEXT = {
         "guide": GUIDE_VI,
         "zero_weights": "Hãy đặt ít nhất một trọng số lớn hơn 0.",
         "computing": "Đang tính toán…",
-        "best": "Cửa sổ tốt nhất (UTC)",
+        "best": "Cửa sổ tốt nhất (giờ địa phương)",
+        "tz": "Múi giờ (UTC+)",
         "mean": "Điểm trung bình",
         "robust": "Độ bền vững của giờ tốt nhất",
         "robust_help": "Tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất",
@@ -252,6 +273,7 @@ with st.sidebar:
     lon = st.number_input(T["lon"], -180.0, 180.0, 106.70, 0.01, key="lon")
     target = st.selectbox(T["target"], TARGETS, key="target")
     date = st.date_input(T["date"], pd.Timestamp.now().date(), key="date")
+    tz = st.number_input(T["tz"], -12.0, 14.0, 7.0, 0.5, key="tz")
     offline = st.checkbox(T["offline"], value=False, key="offline")
 
     st.header(T["weights"])
@@ -280,11 +302,13 @@ with tab_plan:
     weights = Weights(w_alt, w_moon, w_cloud, w_see)
     with st.spinner(T["computing"]):
         df, meta = build_table(lat, lon, target, pd.Timestamp(date), weights, offline, get_model())
+    to_local = pd.Timedelta(hours=tz)
+    labels = [f"{t + to_local:%H:%M}" for t in df.index]
 
     c1, c2, c3 = st.columns(3)
     if df["observable"].any():
         start, end, mean_s = best_window(df, window)
-        c1.metric(T["best"], f"{start:%H:%M} – {end + pd.Timedelta(hours=1):%H:%M}")
+        c1.metric(T["best"], f"{start + to_local:%H:%M} – {end + to_local + pd.Timedelta(hours=1):%H:%M}")
         c2.metric(T["mean"], f"{mean_s:.2f}")
         freq = robust_best_hours(df)
         c3.metric(T["robust"], f"{freq.max():.0%}", help=T["robust_help"])
@@ -292,15 +316,15 @@ with tab_plan:
         c1.error(T["never"])
 
     st.subheader(T["score_time"])
-    st.line_chart(df[["score"]])
+    st.altair_chart(night_chart(df, ["score"], labels), use_container_width=True)
 
     left, right = st.columns(2)
     with left:
         st.subheader(T["criteria"])
-        st.line_chart(df[["g_altitude", "g_moon", "g_cloud", "g_seeing"]])
+        st.altair_chart(night_chart(df, ["g_altitude", "g_moon", "g_cloud", "g_seeing"], labels), use_container_width=True)
     with right:
         st.subheader(T["seeing"])
-        st.line_chart(df[["seeing_arcsec"]])
+        st.altair_chart(night_chart(df, ["seeing_arcsec"], labels), use_container_width=True)
 
     with st.expander(T["pareto"]):
         st.dataframe(pareto_front(df).round(2))
