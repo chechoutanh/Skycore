@@ -59,8 +59,9 @@ Each criterion is normalized to a **0 (bad) – 1 (good)** scale and combined in
 
 $$S(t) = \mathbb{1}[\text{observable}(t)]\sum_i w_i\,g_i(t), \qquad \sum_i w_i = 1.$$
 
-An hour counts as *observable* only when the Sun is below −18° (astronomical night)
-and the target is above 15°.
+An hour counts as *observable* only when the target is above 15° and the sky is dark enough for it:
+Sun below −18° for galaxies, nebulae and clusters, −12° for naked-eye constellations, −6° for bright planets.
+The Sun itself is a daytime target, so the Moon does not count against it.
 
 Besides the total score, the app also reports:
 
@@ -92,8 +93,9 @@ Mỗi tiêu chí được chuẩn hoá về thang **0 (xấu) – 1 (tốt)** r�
 
 $$S(t) = \mathbb{1}[\text{quan sát được}(t)]\sum_i w_i\,g_i(t), \qquad \sum_i w_i = 1.$$
 
-Một giờ chỉ được tính là *quan sát được* khi Mặt Trời thấp hơn −18° (đêm thiên văn)
-và mục tiêu cao hơn 15°.
+Một giờ chỉ được tính là *quan sát được* khi mục tiêu cao hơn 15° và trời đủ tối cho mục tiêu đó:
+Mặt Trời thấp hơn −18° với thiên hà, tinh vân, cụm sao; −12° với chòm sao nhìn bằng mắt thường; −6° với hành tinh sáng.
+Bản thân Mặt Trời là mục tiêu ban ngày, nên Mặt Trăng không bị tính là bất lợi.
 
 Ngoài điểm tổng, ứng dụng còn đưa ra:
 
@@ -113,7 +115,7 @@ GUIDE_EN = """
 
 * **Latitude / Longitude**: your observing site. Default is Ho Chi Minh City (10.78°, 106.70°).
   Right-click a spot on Google Maps to copy its coordinates.
-* **Target**: the object to observe (6 deep-sky objects + 4 planets).
+* **Target**: the object to observe: 6 deep-sky objects, 7 planets, the Sun and 10 well-known constellations.
 * **Date (evening)**: the local date of the evening you plan to observe. The grid covers 24 hours from local noon; times are shown in local time (see *UTC offset*).
 * **UTC offset (h)**: your time zone, e.g. 7 for Vietnam, −5 for New York (winter).
 * **Offline demo**: use when there is no internet; the app then uses *synthetic* weather and says so.
@@ -155,7 +157,7 @@ GUIDE_VI = """
 
 * **Vĩ độ / Kinh độ**: toạ độ nơi quan sát. Mặc định là TP. Hồ Chí Minh (10.78°, 106.70°).
   Lấy toạ độ bằng cách nhấp chuột phải trên Google Maps.
-* **Mục tiêu**: thiên thể muốn quan sát (6 thiên thể sâu + 4 hành tinh).
+* **Mục tiêu**: thiên thể muốn quan sát: 6 thiên thể sâu, 7 hành tinh, Mặt Trời và 10 chòm sao phổ biến.
 * **Ngày (buổi tối)**: ngày địa phương của buổi tối định quan sát. Lưới tính toán là 24 giờ tính từ trưa địa phương; mọi giờ hiển thị theo giờ địa phương (xem *Múi giờ*).
 * **Múi giờ (UTC+)**: ví dụ 7 cho Việt Nam, −5 cho New York (mùa đông).
 * **Chế độ offline**: bật khi không có mạng; ứng dụng dùng thời tiết *giả lập* và ghi rõ trên giao diện.
@@ -216,6 +218,7 @@ TEXT = {
         "robust": "Robustness of best hour",
         "robust_help": "Share of random weight sets that pick the same best hour",
         "never": "Target never observable tonight (twilight / too low).",
+        "sun_warning": "Never look at the Sun through a telescope, binoculars or with the naked eye without a certified solar filter.",
         "score_time": "Score over time",
         "criteria": "Criteria (0 = bad, 1 = good)",
         "seeing": "Predicted seeing (arcsec)",
@@ -249,6 +252,7 @@ TEXT = {
         "robust": "Độ bền vững của giờ tốt nhất",
         "robust_help": "Tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất",
         "never": "Mục tiêu không quan sát được đêm nay (trời chưa đủ tối / mục tiêu quá thấp).",
+        "sun_warning": "Tuyệt đối không nhìn Mặt Trời qua kính thiên văn, ống nhòm hay bằng mắt thường nếu không có kính lọc Mặt Trời đạt chuẩn.",
         "score_time": "Điểm theo thời gian",
         "criteria": "Các tiêu chí (0 = xấu, 1 = tốt)",
         "seeing": "Seeing dự đoán (arcsec)",
@@ -299,6 +303,8 @@ with tab_plan:
         st.warning(T["zero_weights"])
         st.stop()
 
+    if target == "Sun":
+        st.warning("⚠️ " + T["sun_warning"])
     weights = Weights(w_alt, w_moon, w_cloud, w_see)
     with st.spinner(T["computing"]):
         df, meta = build_table(lat, lon, target, pd.Timestamp(date), weights, offline, get_model())

@@ -29,3 +29,21 @@ def test_sky_table_far_future_works_offline():
 
     t = sky_table(10.78, 106.70, "M31 (Andromeda Galaxy)", pd.date_range("2028-06-01", periods=2, freq="h"))
     assert t.notna().all().all()
+
+
+def test_sun_is_a_daytime_target():
+    X, y = simulated_training_set(hours=24 * 30)
+    model = SeeingModel(n_estimators=20).fit(X, y)
+    df, _ = build_table(10.78, 106.70, "Sun", pd.Timestamp("2026-01-15"), offline=True, model=model)
+    obs = df[df["observable"]]
+    assert len(obs) > 0 and (obs["sun_alt"] > 15).all()
+    assert (df["g_moon"] == 1.0).all()
+
+
+def test_every_target_has_geometry():
+    from skyscore.astro import TARGETS, sky_table
+
+    times = pd.date_range("2026-01-15 12:00", periods=2, freq="h")
+    for name in TARGETS:
+        t = sky_table(10.78, 106.70, name, times)
+        assert t["target_alt"].between(-90, 90).all(), name

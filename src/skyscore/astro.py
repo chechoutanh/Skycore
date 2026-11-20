@@ -28,13 +28,37 @@ DEEP_SKY = {
     "M8 (Lagoon Nebula)": (270.92, -24.38),
     "M104 (Sombrero Galaxy)": (189.9976, -11.6231),
 }
-SOLAR_SYSTEM = ["Jupiter", "Saturn", "Mars", "Venus"]
-TARGETS = list(DEEP_SKY) + SOLAR_SYSTEM
+# Naked-eye constellations: approximate centre of the main star pattern (RA deg, Dec deg).
+CONSTELLATIONS = {
+    "Orion (constellation)": (83.0, 3.0),
+    "Scorpius (constellation)": (253.0, -30.0),
+    "Sagittarius - Teapot (constellation)": (283.0, -29.0),
+    "Ursa Major - Big Dipper (constellation)": (184.0, 56.0),
+    "Cassiopeia (constellation)": (15.0, 60.0),
+    "Cygnus (constellation)": (309.0, 40.0),
+    "Crux - Southern Cross (constellation)": (187.0, -60.0),
+    "Leo (constellation)": (160.0, 17.0),
+    "Taurus (constellation)": (68.0, 18.0),
+    "Gemini (constellation)": (108.0, 24.0),
+}
+SOLAR_SYSTEM = ["Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Sun"]
+TARGETS = list(DEEP_SKY) + SOLAR_SYSTEM + list(CONSTELLATIONS)
+
+
+def sun_limit(name: str) -> float:
+    """Highest Sun altitude (deg) at which the target can be observed."""
+    if name == "Sun":
+        return 90.0  # daytime target: no darkness needed
+    if name in ("Mercury", "Venus", "Mars", "Jupiter", "Saturn"):
+        return -6.0  # bright planets: visible from the end of civil twilight
+    if name in CONSTELLATIONS:
+        return -12.0  # naked-eye star patterns: nautical twilight is dark enough
+    return -18.0  # faint targets need astronomical night
 
 
 def _target_coord(name: str, t: Time, loc: EarthLocation):
-    if name in DEEP_SKY:
-        ra, dec = DEEP_SKY[name]
+    if name in DEEP_SKY or name in CONSTELLATIONS:
+        ra, dec = DEEP_SKY.get(name) or CONSTELLATIONS[name]
         return SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
     if name in SOLAR_SYSTEM:
         return get_body(name.lower(), t, loc)
@@ -64,7 +88,7 @@ def sky_table(
     """Return target/Sun/Moon geometry for each timestamp.
 
     Columns: target_alt, sun_alt, moon_alt, moon_illum, moon_sep (degrees,
-    illumination in [0, 1]).
+    illumination in [0, 1]) and sun_limit (darkness the target needs, degrees).
     """
     loc = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=elevation_m * u.m)
     t = Time(times.values)
@@ -85,6 +109,7 @@ def sky_table(
             "moon_alt": np.asarray(moon_altaz.alt.deg),
             "moon_illum": moon_illumination(t, loc),
             "moon_sep": np.asarray(sep),
+            "sun_limit": sun_limit(target),
         },
         index=times,
     )

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-SUN_LIMIT_DEG = -18.0  # astronomical twilight
+SUN_LIMIT_DEG = -18.0  # astronomical twilight; default when the table has no sun_limit column
 MIN_ALT_DEG = 15.0  # below this, airmass is too large
 SEEING_BEST, SEEING_WORST = 0.8, 3.5  # arcsec, for normalization
 
@@ -57,10 +57,14 @@ def add_components(df: pd.DataFrame) -> pd.DataFrame:
     # Moon penalty: bright, high and close to the target is worst.
     moon_up = (out["moon_alt"] > 0).astype(float)
     proximity = np.exp(-out["moon_sep"] / 40.0)
-    out["g_moon"] = 1.0 - out["moon_illum"] * moon_up * (0.4 + 0.6 * proximity)
+    limit = out["sun_limit"] if "sun_limit" in out else SUN_LIMIT_DEG
+    # The Moon does not brighten the daytime sky, so it cannot hurt a daytime target (the Sun).
+    out["g_moon"] = np.where(
+        np.asarray(limit) > 0, 1.0, 1.0 - out["moon_illum"] * moon_up * (0.4 + 0.6 * proximity)
+    )
     out["g_cloud"] = minmax(out["cloud_cover"], 0, 100, invert=True)
     out["g_seeing"] = minmax(out["seeing_arcsec"], SEEING_BEST, SEEING_WORST, invert=True)
-    out["observable"] = (out["sun_alt"] < SUN_LIMIT_DEG) & (out["target_alt"] > MIN_ALT_DEG)
+    out["observable"] = (out["sun_alt"] < limit) & (out["target_alt"] > MIN_ALT_DEG)
     return out
 
 

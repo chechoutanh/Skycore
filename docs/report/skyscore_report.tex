@@ -142,8 +142,8 @@ $\theta$ giữa Mặt Trăng và mục tiêu, và phần đĩa trăng được c
 k = \frac{1+\cos i}{2},
 \end{equation}
 trong đó $i$ là góc pha. Mục tiêu gồm 6 thiên thể sâu (M31, M42, M45, M13, M8, M104 --- toạ độ
-J2000) và 4 hành tinh (Sao Mộc, Sao Thổ, Sao Hoả, Sao Kim --- lịch thiên văn tích hợp của
-Astropy, không cần mạng).
+J2000), 10 chòm sao phổ biến (toạ độ tâm gần đúng của hình sao chính), 7 hành tinh (Sao Thuỷ
+đến Sao Hải Vương) và Mặt Trời --- hai nhóm sau dùng lịch thiên văn tích hợp của Astropy, không cần mạng.
 
 \subsection{Thời tiết}
 Biến theo giờ từ Open-Meteo (miễn phí, không cần khoá API): độ che phủ mây, độ ẩm tương đối,
@@ -174,9 +174,11 @@ S(t) = \ind[\text{obs}(t)]\sum_{i\in\{\text{alt,moon,cloud,see}\}} w_i\,g_i(t),
 \end{equation}
 với ràng buộc cứng
 \begin{equation}
-\text{obs}(t) \iff h_\odot(t) < -18^\circ \ \wedge\ h(t) > 15^\circ .
+\text{obs}(t) \iff h_\odot(t) < h_{\odot,\max} \ \wedge\ h(t) > 15^\circ .
 \end{equation}
-Điều kiện thứ nhất là đêm thiên văn; điều kiện thứ hai loại bỏ vùng airmass lớn ($X>3{,}9$).
+Ngưỡng $h_{\odot,\max}$ phụ thuộc mục tiêu: $-18^\circ$ (đêm thiên văn) với thiên thể sâu,
+$-12^\circ$ với chòm sao nhìn bằng mắt thường, $-6^\circ$ với hành tinh sáng; Mặt Trời là mục tiêu
+ban ngày nên không có ngưỡng và $g_{\text{moon}}=1$; điều kiện thứ hai loại bỏ vùng airmass lớn ($X>3{,}9$).
 Trọng số mặc định: $\bm{w} = (0{,}35;\ 0{,}20;\ 0{,}30;\ 0{,}15)$, người dùng có thể thay đổi
 và hệ thống tự chuẩn hoá về tổng bằng 1.
 

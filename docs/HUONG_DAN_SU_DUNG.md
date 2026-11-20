@@ -63,7 +63,7 @@ Dòng thông tin cuối trang cho biết nguồn thời tiết (thật hay giả
 ## 3. Câu hỏi thường gặp
 
 **"Target never observable tonight"?**
-Mục tiêu không lên cao quá 15° trong lúc trời tối hẳn (Mặt Trời dưới −18°). Hãy thử ngày khác hoặc mục tiêu khác. Ví dụ M42 dễ quan sát vào các tháng 11 đến 3.
+Mục tiêu không lên cao quá 15° trong lúc trời đủ tối cho nó (Mặt Trời dưới −18° với thiên thể sâu, −12° với chòm sao, −6° với hành tinh sáng). Hãy thử ngày khác hoặc mục tiêu khác. Ví dụ M42 dễ quan sát vào các tháng 11 đến 3.
 
 **Thấy chữ "Synthetic (offline demo data)" dù không bật Offline?**
 Ứng dụng không lấy được dự báo từ Open-Meteo (mất mạng, hoặc ngày chọn ngoài khoảng dự báo ~4 ngày tới). Kết quả lúc đó chỉ để minh hoạ.
