@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from skyscore.astro import TARGETS  # noqa: E402
 from skyscore.evaluation import add_predictions, evaluate, load_logs  # noqa: E402
 from skyscore.pipeline import build_table  # noqa: E402
-from skyscore.scoring import Weights, best_window, pareto_front, robust_best_hours  # noqa: E402
+from skyscore.scoring import SEEING_BEST, SEEING_WORST, Weights, best_window, minmax, pareto_front, robust_best_hours  # noqa: E402
 from skyscore.seeing_model import train_default  # noqa: E402
 
 st.set_page_config(page_title="SkyScore", page_icon="🔭", layout="wide")
@@ -47,6 +47,12 @@ def log_unlocked(T) -> bool:
     if entered:
         st.error(T["log_pw_bad"])
     return False
+
+
+@st.cache_data(show_spinner=False)
+def predicted_logs(stamp: tuple, offline: bool) -> pd.DataFrame:
+    """Logged hours plus what SkyScore forecast for them; `stamp` (file mtimes) refreshes it after a save."""
+    return add_predictions(load_logs(EVENTS, OBS), get_model(), offline=offline)
 
 
 def save_log(event: dict, obs: dict) -> str:
@@ -281,6 +287,11 @@ TEXT = {
         "ev_note": "Based on **{events}** sessions / **{hours}** logged hours. Under ~20 sessions these numbers are mostly noise. "
         "The 'best hour' check only means something for nights where you logged several hours.",
         "ev_missing": "Not enough data yet",
+        "cmp_title": "Forecast vs what you saw",
+        "cmp_help": "Each row is a logged hour. Bars far apart = the cloud forecast was wrong that night. "
+        "Seeing and SkyScore's score are converted to the same 1–5 scale as your ratings so they can be compared side by side.",
+        "cmp_cols": {"hour": "Session", "date": "Date", "site": "Place", "cloud_f": "Cloud forecast", "cloud_o": "Cloud seen",
+                     "see_f": "Seeing forecast", "see_o": "Seeing seen", "q_f": "SkyScore score", "q_o": "Your rating"},
         "intro": INTRO_EN,
         "guide": GUIDE_EN,
         "zero_weights": "Set at least one weight above 0.",
@@ -361,6 +372,11 @@ TEXT = {
         "ev_note": "Dựa trên **{events}** buổi / **{hours}** giờ đã ghi. Dưới ~20 buổi thì các con số này chủ yếu là nhiễu. "
         "Phép thử 'giờ tốt nhất' chỉ có ý nghĩa với những đêm bạn ghi nhiều giờ.",
         "ev_missing": "Chưa đủ dữ liệu",
+        "cmp_title": "Dự báo so với thực tế",
+        "cmp_help": "Mỗi dòng là một giờ đã ghi. Hai cột cách xa nhau = đêm đó dự báo mây sai nhiều. "
+        "Seeing và điểm SkyScore được quy về cùng thang 1–5 như đánh giá của bạn để đặt cạnh nhau so sánh.",
+        "cmp_cols": {"hour": "Buổi", "date": "Ngày", "site": "Địa điểm", "cloud_f": "Mây dự báo", "cloud_o": "Mây thực tế",
+                     "see_f": "Seeing dự báo", "see_o": "Seeing thực tế", "q_f": "Điểm SkyScore", "q_o": "Bạn đánh giá"},
         "intro": INTRO_VI,
         "guide": GUIDE_VI,
         "zero_weights": "Hãy đặt ít nhất một trọng số lớn hơn 0.",
@@ -491,10 +507,11 @@ with tab_log:
             st.success(T["log_saved"].format(eid=eid))
 
     logs = load_logs(EVENTS, OBS)
+    stamp = (EVENTS.stat().st_mtime, OBS.stat().st_mtime)
     if st.button(T["log_eval"]):
         try:
             with st.spinner(T["computing"]):
-                m = evaluate(add_predictions(logs, get_model(), offline=offline))
+                m = evaluate(predicted_logs(stamp, offline))
         except Exception as e:  # network or bad rows: show it, keep the rest of the app usable
             st.error(T["log_eval_err"].format(e=e))
         else:
@@ -517,6 +534,33 @@ with tab_log:
             a.download_button(T["log_dl_events"], EVENTS.read_bytes(), "events.csv", "text/csv")
             b.download_button(T["log_dl_obs"], OBS.read_bytes(), "observations.csv", "text/csv")
             st.caption(T["log_cloud_warn"])
+
+            st.subheader(T["cmp_title"])
+            try:
+                with st.spinner(T["computing"]):
+                    p = predicted_logs(stamp, offline)
+            except Exception as e:  # network or bad rows: report, keep the table above usable
+                st.error(T["log_eval_err"].format(e=e))
+            else:
+                st.markdown(T["cmp_help"])
+                C = T["cmp_cols"]
+                cmp = pd.DataFrame({
+                    C["hour"]: p["event_id"] + " " + p["time"],
+                    C["date"]: p["date"],
+                    C["site"]: p["site"],
+                    C["cloud_f"]: p["cloud_forecast"], C["cloud_o"]: p["cloud_observed"],
+                    # Predicted arcsec mapped onto the 1–5 scale observers use (5 = steadiest).
+                    C["see_f"]: 1 + 4 * minmax(p["seeing_pred"], SEEING_BEST, SEEING_WORST, invert=True),
+                    C["see_o"]: p["seeing_value"].where(p["seeing_method"] == "scale_1_5"),
+                    C["q_f"]: 1 + 4 * p["score"], C["q_o"]: p["quality_rating"],
+                })
+                st.bar_chart(cmp, x=C["hour"], y=[C["cloud_f"], C["cloud_o"]], stack=False, y_label="%", x_label="")
+                pct = st.column_config.NumberColumn(format="%.0f%%")
+                five = st.column_config.NumberColumn(format="%.1f / 5")
+                st.dataframe(cmp, hide_index=True, column_config={
+                    C["cloud_f"]: pct, C["cloud_o"]: pct,
+                    C["see_f"]: five, C["see_o"]: five, C["q_f"]: five, C["q_o"]: five,
+                })
 
 with tab_intro:
     st.markdown(T["intro"])
