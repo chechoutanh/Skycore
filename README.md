@@ -58,30 +58,32 @@ These numbers only show that the pipeline can recover the proxy; they are **not*
 
 ### Evaluation on real observing logs
 
-[TODO: fill in after running the evaluation.] Measured seeing, cloud and observing quality from real club events are kept in [`data/`](data/README.md). For each logged hour, `skyscore.evaluation` rebuilds the forecast SkyScore would have made **before** the event (Open-Meteo forecast archive, not hindsight) and compares it with what was measured:
+Measured seeing, cloud and observing quality from real club events are kept in [`data/`](data/README.md). For each logged hour, `skyscore.evaluation` rebuilds the forecast SkyScore would have made **before** the event (Open-Meteo forecast archive, not hindsight) and compares it with what was measured:
 
 ```bash
-python -m skyscore.evaluation data/events.csv data/observations.csv
+PYTHONPATH=src python -m skyscore.evaluation data/events.csv data/observations.csv
 ```
 
 | Metric | SkyScore | Baseline |
 |---|---|---|
-| Seeing rank correlation (Spearman) | [TODO] | 0 (no skill) |
-| Seeing MAE, FWHM hours (″) | [TODO] | [TODO] (climatology) |
-| Cloud MAE (%) | [TODO] | [TODO] (climatology) |
-| Observing rating at the recommended hour (1–5) | [TODO] | [TODO] (random logged hour) |
+| Seeing rank correlation (Spearman, 1–5 scale) | −0.18 | 0 (no skill) |
+| Seeing MAE, FWHM hours (″) | n/a (no FWHM measurements yet) | n/a |
+| Cloud MAE (%) | 60.7 | 10.6 (climatology) |
+| Observing rating at the recommended hour (1–5) | 3.97 | 3.97 (random logged hour) |
 
 The baseline is climatology (always predict the average) because measurements of the same night are not available when the plan is made.
+
+Results above: 7 events, 7 logged hours (one per event), archived Open-Meteo forecasts. **This is too little data for any conclusion.** With one hour per event the recommended hour and a random hour are the same hour, so the rating row cannot show skill; the seeing correlation on 7 points is indistinguishable from noise. The one clear signal is cloud: the forecast said 62–100 % while observers logged 10–50 %, likely because Open-Meteo's total `cloud_cover` includes thin high cirrus that still allows observing in the tropics. Future logs should record every hour of an event, including bad ones.
 
 **To make the model scientifically meaningful**, replace the labels with real measurements, for example the club's own observing logs (estimated seeing from double-star splitting or star FWHM in images), merged with archived weather for the same hours, and call `SeeingModel.fit(X, y, label_source="club logs")`. With real labels, report the CV error against a persistence/climatology baseline.
 
 ## Real-world use
 
-[TODO: confirm details.] SkyScore has been used by 2 astronomy clubs to plan 10 observing events:
+SkyScore has been used at 8 logged observing events, all run by the USAC astronomy club (two co-hosted with KOCUN Cần Thơ and SEAC, International University):
 
 | Club | Since | Members | Events |
 |---|---|---|---|
-| [TODO] | [TODO] | [TODO] | [TODO] |
+| CLB Thiên văn USAC | 2025-03 | [TODO] | 8 (incl. 1 with KOCUN Cần Thơ, 1 with SEAC) |
 
 Event-by-event details are in [`data/events.csv`](data/events.csv).
 
