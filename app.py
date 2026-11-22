@@ -116,6 +116,14 @@ An hour counts as *observable* only when the target is above 15° and the sky is
 Sun below −18° for galaxies, nebulae and clusters, −12° for naked-eye constellations, −6° for bright planets.
 The Sun itself is a daytime target. Moonlight does not count against the Sun or the Moon.
 
+#### How the numbers are calculated
+
+* **Position of the target.** Planets, the Moon, the Sun and planetary moons: Astropy computes their sky position for each hour from an ephemeris (`get_body`), as seen from your latitude/longitude. Deep-sky objects and constellations are fixed points (RA/Dec). Each position is converted to the local sky: **altitude** $h$ above the horizon.
+* **Visibility (is it blocked?).** A target is hidden by the horizon when $h<0°$, and too low to be useful below 15° (thick air, buildings, trees). The Sun must also be low enough: below −18°, −12° or −6° depending on the target (see above). Outside these limits the hour scores 0.
+* **Altitude score.** $g_{\text{alt}}=\max(0,\sin h)$, a proxy for $1/\text{airmass}$: the target at the zenith scores 1, at 30° it scores 0.5.
+* **Moon.** The illuminated fraction is $k=(1+\cos i)/2$, where $i$ is the Sun–Moon phase angle. The penalty grows with $k$ and shrinks with the Moon–target angular separation $\theta$ (as $e^{-\theta/40°}$); it applies only while the Moon is above the horizon.
+* **Clouds and seeing.** Cloud cover comes from the Open-Meteo forecast ($g=1-c/100$). Seeing (arcsec) comes from the Random Forest model, then $g_{\text{see}}$ maps 0.8″ (best) to 3.5″ (worst) onto 1 to 0.
+
 Besides the total score, the app also reports:
 
 * **Best window**: the *L* consecutive hours with the highest mean score.
@@ -149,6 +157,14 @@ $$S(t) = \mathbb{1}[\text{quan sát được}(t)]\sum_i w_i\,g_i(t), \qquad \sum
 Một giờ chỉ được tính là *quan sát được* khi mục tiêu cao hơn 15° và trời đủ tối cho mục tiêu đó:
 Mặt Trời thấp hơn −18° với thiên hà, tinh vân, cụm sao; −12° với chòm sao nhìn bằng mắt thường; −6° với hành tinh sáng.
 Bản thân Mặt Trời là mục tiêu ban ngày. Ánh trăng không bị tính là bất lợi khi mục tiêu là Mặt Trời hoặc Mặt Trăng.
+
+#### Các con số được tính như thế nào
+
+* **Vị trí mục tiêu.** Hành tinh, Mặt Trăng, Mặt Trời và các vệ tinh hành tinh: Astropy tính vị trí trên bầu trời cho từng giờ từ lịch thiên văn (`get_body`), theo vĩ độ/kinh độ của bạn. Thiên thể xa (thiên hà, tinh vân, cụm sao) và chòm sao là các điểm cố định (RA/Dec). Mỗi vị trí được đổi sang bầu trời địa phương: **độ cao** $h$ so với đường chân trời.
+* **Độ khuất (có bị che không).** Mục tiêu bị đường chân trời che khi $h<0°$, và quá thấp để dùng được khi dưới 15° (khí quyển dày, nhà cửa, cây cối). Mặt Trời cũng phải đủ thấp: dưới −18°, −12° hoặc −6° tuỳ mục tiêu (xem trên). Ngoài các giới hạn này, giờ đó được 0 điểm.
+* **Điểm độ cao.** $g_{\text{alt}}=\max(0,\sin h)$, đại diện cho $1/\text{airmass}$: mục tiêu ở thiên đỉnh được 1, ở 30° được 0,5.
+* **Mặt Trăng.** Phần được chiếu sáng là $k=(1+\cos i)/2$, với $i$ là góc pha Mặt Trời–Mặt Trăng. Mức phạt tăng theo $k$ và giảm theo góc cách $\theta$ giữa Mặt Trăng và mục tiêu (như $e^{-\theta/40°}$); chỉ áp dụng khi Mặt Trăng ở trên đường chân trời.
+* **Mây và seeing.** Mây lấy từ dự báo Open-Meteo ($g=1-c/100$). Seeing (arcsec) do mô hình Random Forest dự đoán, rồi $g_{\text{see}}$ ánh xạ 0,8″ (tốt nhất) đến 3,5″ (tệ nhất) sang 1 đến 0.
 
 Ngoài điểm tổng, ứng dụng còn đưa ra:
 
