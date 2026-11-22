@@ -1,6 +1,7 @@
 """Streamlit dashboard for SkyScore.  Run:  streamlit run app.py"""
 
 import sys
+from datetime import time as dtime
 from pathlib import Path
 
 import altair as alt
@@ -10,6 +11,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from skyscore.astro import TARGETS  # noqa: E402
+from skyscore.evaluation import add_predictions, evaluate, load_logs  # noqa: E402
 from skyscore.pipeline import build_table  # noqa: E402
 from skyscore.scoring import Weights, best_window, pareto_front, robust_best_hours  # noqa: E402
 from skyscore.seeing_model import train_default  # noqa: E402
@@ -17,9 +19,31 @@ from skyscore.seeing_model import train_default  # noqa: E402
 st.set_page_config(page_title="SkyScore", page_icon="🔭", layout="wide")
 
 
+DATA = Path(__file__).parent / "data"
+EVENTS, OBS = DATA / "events.csv", DATA / "observations.csv"
+
+
 @st.cache_resource
 def get_model():
     return train_default()
+
+
+def save_log(event: dict, obs: dict) -> str:
+    """Append one observed hour to the logs; reuse the event when date, target and site match."""
+    ev = pd.read_csv(EVENTS)
+    same = ev[
+        (ev["date"] == event["date"]) & (ev["target"] == event["target"])
+        & ((ev["lat"] - event["lat"]).abs() < 0.01) & ((ev["lon"] - event["lon"]).abs() < 0.01)
+    ]
+    if len(same):
+        eid = same["event_id"].iloc[0]
+    else:
+        n = pd.to_numeric(ev["event_id"].str[1:], errors="coerce").max()
+        eid = f"E{int(0 if pd.isna(n) else n) + 1:02d}"
+        pd.DataFrame([{**event, "event_id": eid}]).reindex(columns=ev.columns).to_csv(EVENTS, mode="a", header=False, index=False)
+    cols = pd.read_csv(OBS, nrows=0).columns
+    pd.DataFrame([{**obs, "event_id": eid}]).reindex(columns=cols).to_csv(OBS, mode="a", header=False, index=False)
+    return eid
 
 
 def night_chart(df: pd.DataFrame, cols: list[str], labels: list[str]):
@@ -209,7 +233,30 @@ TEXT = {
         "w_cloud": "Clear sky",
         "w_see": "Steady air (seeing)",
         "window": "Window length (h)",
-        "tabs": ["🔭 Planner", "ℹ️ About", "📖 Guide"],
+        "tabs": ["🔭 Planner", "📝 Observing log", "ℹ️ About", "📖 Guide"],
+        "log_intro": "After each session, note how the sky **really** was. With 20–30 sessions we can measure how accurate SkyScore is. "
+        "Log bad hours too (clouds, blurry stars): they matter just as much.",
+        "log_from_sidebar": "Site, target and date come from the sidebar: **{target}**, {date}, ({lat:.2f}, {lon:.2f}), UTC{tz:+g}.",
+        "log_site": "Place name", "log_club": "Club / observer",
+        "log_time": "Time observed (local)", "log_duration": "How long (h)",
+        "log_seeing": "How steady were the stars?", "log_seeing_help": "1 = boiling, very blurry · 5 = rock steady, sharp",
+        "log_quality": "Overall, how good was it?", "log_quality_help": "1 = useless · 5 = excellent",
+        "log_cloud": "Sky covered by cloud (%)",
+        "log_wind": "Wind", "wind": {"calm": "Calm", "light": "Light", "strong": "Strong (shook the telescope)"},
+        "log_notes": "Notes (optional)", "log_submit": "💾 Save this entry",
+        "log_saved": "Saved to session {eid}. Logging another hour of the same night? Change the time and save again.",
+        "log_cloud_warn": "Note: on a hosted app (e.g. Streamlit Cloud) saved entries can disappear on restart. Download the CSV files below to keep them.",
+        "log_table": "Logged sessions ({n} entries)",
+        "log_dl_events": "⬇️ events.csv", "log_dl_obs": "⬇️ observations.csv",
+        "log_eval": "📊 How accurate is SkyScore so far?",
+        "log_eval_err": "Could not evaluate: {e}",
+        "ev_rating": "Real rating at SkyScore's best hour", "ev_rating_delta": "{d:+.2f} vs a random logged hour",
+        "ev_cloud": "Cloud forecast error", "ev_cloud_delta": "{d:+.0f} pts vs guessing the average",
+        "ev_seeing": "Seeing agreement",
+        "ev_seeing_help": "Rank correlation between predicted and logged seeing: 1 = perfect, 0 = no relation, negative = backwards.",
+        "ev_note": "Based on **{events}** sessions / **{hours}** logged hours. Under ~20 sessions these numbers are mostly noise. "
+        "The 'best hour' check only means something for nights where you logged several hours.",
+        "ev_missing": "Not enough data yet",
         "intro": INTRO_EN,
         "guide": GUIDE_EN,
         "zero_weights": "Set at least one weight above 0.",
@@ -239,6 +286,8 @@ TEXT = {
         "names": {"g_altitude": "Height in sky", "g_moon": "Moon darkness", "g_cloud": "Clear sky", "g_seeing": "Steady air"},
         "seeing_help": "Lower is better: how much stars blur from air turbulence (arcseconds).",
         "date_help": "The evening you plan to observe.",
+        "date_text": "…or type / paste a date",
+        "date_bad": "Could not read that date. Try 22/11/2026 or 2026-11-22.",
         "tz_help": "Hours ahead of UTC. Vietnam = 7.",
         "lat_help": "Right-click a spot in Google Maps to copy its coordinates.",
         "window_help": "How many hours in a row you plan to observe.",
@@ -261,7 +310,30 @@ TEXT = {
         "w_cloud": "Trời quang",
         "w_see": "Khí quyển ổn định (seeing)",
         "window": "Độ dài cửa sổ (giờ)",
-        "tabs": ["🔭 Lập lịch", "ℹ️ Giới thiệu", "📖 Hướng dẫn"],
+        "tabs": ["🔭 Lập lịch", "📝 Nhật ký quan sát", "ℹ️ Giới thiệu", "📖 Hướng dẫn"],
+        "log_intro": "Sau mỗi buổi, ghi lại bầu trời **thực tế** ra sao. Có khoảng 20–30 buổi là đo được SkyScore chuẩn đến đâu. "
+        "Hãy ghi cả những giờ xấu (mây, sao nhoè): chúng quan trọng không kém.",
+        "log_from_sidebar": "Địa điểm, mục tiêu và ngày lấy từ thanh bên: **{target}**, {date}, ({lat:.2f}, {lon:.2f}), UTC{tz:+g}.",
+        "log_site": "Tên địa điểm", "log_club": "CLB / người quan sát",
+        "log_time": "Giờ quan sát (địa phương)", "log_duration": "Kéo dài (giờ)",
+        "log_seeing": "Sao có ổn định không?", "log_seeing_help": "1 = rung mạnh, rất nhoè · 5 = đứng yên, rất nét",
+        "log_quality": "Đánh giá chung buổi quan sát", "log_quality_help": "1 = không xem được gì · 5 = tuyệt vời",
+        "log_cloud": "Phần trời bị mây che (%)",
+        "log_wind": "Gió", "wind": {"calm": "Lặng", "light": "Nhẹ", "strong": "Mạnh (làm rung kính)"},
+        "log_notes": "Ghi chú (không bắt buộc)", "log_submit": "💾 Lưu mục này",
+        "log_saved": "Đã lưu vào buổi {eid}. Muốn ghi thêm giờ khác của cùng đêm? Đổi giờ rồi lưu tiếp.",
+        "log_cloud_warn": "Lưu ý: nếu app chạy trên máy chủ (ví dụ Streamlit Cloud), dữ liệu đã lưu có thể mất khi khởi động lại. Hãy tải các file CSV bên dưới để giữ lại.",
+        "log_table": "Các buổi đã ghi ({n} mục)",
+        "log_dl_events": "⬇️ events.csv", "log_dl_obs": "⬇️ observations.csv",
+        "log_eval": "📊 SkyScore chuẩn đến đâu?",
+        "log_eval_err": "Không đánh giá được: {e}",
+        "ev_rating": "Điểm thực tế ở giờ SkyScore chọn", "ev_rating_delta": "{d:+.2f} so với một giờ bất kỳ",
+        "ev_cloud": "Sai số dự báo mây", "ev_cloud_delta": "{d:+.0f} điểm so với đoán trung bình",
+        "ev_seeing": "Độ khớp seeing",
+        "ev_seeing_help": "Tương quan thứ hạng giữa seeing dự đoán và ghi nhận: 1 = khớp hoàn toàn, 0 = không liên quan, âm = ngược.",
+        "ev_note": "Dựa trên **{events}** buổi / **{hours}** giờ đã ghi. Dưới ~20 buổi thì các con số này chủ yếu là nhiễu. "
+        "Phép thử 'giờ tốt nhất' chỉ có ý nghĩa với những đêm bạn ghi nhiều giờ.",
+        "ev_missing": "Chưa đủ dữ liệu",
         "intro": INTRO_VI,
         "guide": GUIDE_VI,
         "zero_weights": "Hãy đặt ít nhất một trọng số lớn hơn 0.",
@@ -291,6 +363,8 @@ TEXT = {
         "names": {"g_altitude": "Độ cao", "g_moon": "Trăng tối", "g_cloud": "Trời quang", "g_seeing": "Khí quyển ổn định"},
         "seeing_help": "Càng thấp càng tốt: mức nhoè của sao do nhiễu loạn không khí (giây cung).",
         "date_help": "Buổi tối bạn định quan sát.",
+        "date_text": "…hoặc gõ / dán ngày",
+        "date_bad": "Không đọc được ngày này. Thử 22/11/2026 hoặc 2026-11-22.",
         "tz_help": "Số giờ chênh với UTC. Việt Nam = 7.",
         "lat_help": "Nhấp chuột phải trên Google Maps để lấy toạ độ.",
         "window_help": "Số giờ liên tiếp bạn định quan sát.",
@@ -317,6 +391,17 @@ def apply_preset(widget_key):
     st.session_state.update(zip(W_KEYS, PRESETS[st.session_state.preset]))
 
 
+def sync_date():
+    """Typed or pasted date → the calendar widget. Day first (22/11/2026); ISO 2026-11-22 also works."""
+    s = st.session_state.date_text.strip()
+    st.session_state.date_bad = False
+    if s:
+        try:
+            st.session_state.date = pd.to_datetime(s, dayfirst=True).date()
+        except (ValueError, OverflowError):
+            st.session_state.date_bad = True
+
+
 with st.sidebar:
     lang = st.radio(
         "🌐 Language / Ngôn ngữ",
@@ -330,7 +415,10 @@ with st.sidebar:
     lat = st.number_input(T["lat"], -90.0, 90.0, 10.78, 0.01, key="lat", help=T["lat_help"])
     lon = st.number_input(T["lon"], -180.0, 180.0, 106.70, 0.01, key="lon", help=T["lat_help"])
     target = st.selectbox(T["target"], TARGETS, key="target")
-    date = st.date_input(T["date"], pd.Timestamp.now().date(), key="date", help=T["date_help"])
+    date = st.date_input(T["date"], key="date", help=T["date_help"])
+    st.text_input(T["date_text"], key="date_text", on_change=sync_date, placeholder="22/11/2026")
+    if st.session_state.get("date_bad"):
+        st.error(T["date_bad"])
     tz = st.number_input(T["tz"], -12.0, 14.0, 7.0, 0.5, key="tz", help=T["tz_help"])
     offline = st.checkbox(T["offline"], value=False, key="offline")
 
@@ -350,9 +438,57 @@ with st.sidebar:
 st.title("🔭 SkyScore")
 st.caption(T["caption"])
 
-tab_plan, tab_intro, tab_guide = st.tabs(T["tabs"])
+tab_plan, tab_log, tab_intro, tab_guide = st.tabs(T["tabs"])
 
-# Static tabs are filled first so they still render if the planner calls st.stop().
+# Other tabs are filled first so they still render if the planner calls st.stop().
+with tab_log:
+    st.markdown(T["log_intro"])
+    st.caption(T["log_from_sidebar"].format(target=target, date=date, lat=lat, lon=lon, tz=tz))
+    with st.form("log", clear_on_submit=True):
+        a, b = st.columns(2)
+        site = a.text_input(T["log_site"])
+        club = b.text_input(T["log_club"])
+        obs_time = a.time_input(T["log_time"], dtime(21, 0), step=1800)
+        duration = b.number_input(T["log_duration"], 0.5, 12.0, 1.0, 0.5)
+        seeing = a.select_slider(T["log_seeing"], [1, 2, 3, 4, 5], 3, help=T["log_seeing_help"])
+        quality = b.select_slider(T["log_quality"], [1, 2, 3, 4, 5], 3, help=T["log_quality_help"])
+        cloud = a.slider(T["log_cloud"], 0, 100, 0, 10)
+        wind = b.radio(T["log_wind"], list(T["wind"]), format_func=T["wind"].get, horizontal=True)
+        notes = st.text_input(T["log_notes"])
+        if st.form_submit_button(T["log_submit"], type="primary"):
+            eid = save_log(
+                {"date": f"{date:%Y-%m-%d}", "club": club, "site": site, "lat": lat, "lon": lon, "utc_offset": tz, "target": target},
+                {"time": f"{obs_time:%H:%M}", "duration_h": duration, "seeing_value": seeing, "seeing_method": "scale_1_5",
+                 "cloud_observed": cloud, "quality_rating": quality, "wind_feel": wind, "notes": notes},
+            )
+            st.success(T["log_saved"].format(eid=eid))
+    st.caption(T["log_cloud_warn"])
+
+    logs = load_logs(EVENTS, OBS)
+    with st.expander(T["log_table"].format(n=len(logs))):
+        st.dataframe(logs[["event_id", "date", "time", "site", "target", "seeing_value", "cloud_observed", "quality_rating", "notes"]], hide_index=True)
+    a, b = st.columns(2)
+    a.download_button(T["log_dl_events"], EVENTS.read_bytes(), "events.csv", "text/csv")
+    b.download_button(T["log_dl_obs"], OBS.read_bytes(), "observations.csv", "text/csv")
+
+    if st.button(T["log_eval"]):
+        try:
+            with st.spinner(T["computing"]):
+                m = evaluate(add_predictions(logs, get_model(), offline=offline))
+        except Exception as e:  # network or bad rows: show it, keep the rest of the app usable
+            st.error(T["log_eval_err"].format(e=e))
+        else:
+            a, b, c = st.columns(3)
+            if "rating_at_skyscore_hour" in m:
+                a.metric(T["ev_rating"], f"{m['rating_at_skyscore_hour']:.2f} / 5",
+                         T["ev_rating_delta"].format(d=m["rating_at_skyscore_hour"] - m["rating_at_random_hour"]))
+            if "cloud_mae_forecast" in m:
+                b.metric(T["ev_cloud"], f"{m['cloud_mae_forecast']:.0f}%",
+                         T["ev_cloud_delta"].format(d=m["cloud_mae_forecast"] - m["cloud_mae_climatology"]), delta_color="inverse")
+            rho = m.get("seeing_scale_1_5_spearman")
+            c.metric(T["ev_seeing"], T["ev_missing"] if rho is None or pd.isna(rho) else f"{rho:.2f}", help=T["ev_seeing_help"])
+            st.info(T["ev_note"].format(events=m["events"], hours=m["hours"]))
+
 with tab_intro:
     st.markdown(T["intro"])
 with tab_guide:
