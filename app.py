@@ -33,7 +33,7 @@ def night_chart(df: pd.DataFrame, cols: list[str], labels: list[str]):
         .encode(
             x=x,
             y=alt.Y("value:Q", title=None, axis=alt.Axis(format=".2~f")),
-            color=alt.Color("series:N", title=None, scale=alt.Scale(scheme="category10"), legend=alt.Legend(orient="bottom")),
+            color=alt.Color("series:N", title=None, scale=alt.Scale(scheme="category10"), legend=alt.Legend(orient="bottom", columns=2)),
             tooltip=["time", "series", alt.Tooltip("value:Q", format=".2f")],
         )
     )
@@ -120,9 +120,10 @@ GUIDE_EN = """
 * **UTC offset (h)**: your time zone, e.g. 7 for Vietnam, −5 for New York (winter).
 * **Offline demo**: use when there is no internet; the app then uses *synthetic* weather and says so.
 
-**2. Adjust the weights**
+**2. Choose what you want to observe**
 
-Drag the sliders to tell SkyScore what matters to you. They don't need to sum to 1;
+Pick a goal in **What do you want to observe?** and SkyScore sets the weights for you.
+Want more control? Open **Fine-tune weights (advanced)** and drag the sliders to tell SkyScore what matters to you. They don't need to sum to 1;
 the app normalizes them. Examples:
 
 | Goal | Suggestion |
@@ -137,10 +138,10 @@ the app normalizes them. Examples:
 
 * **Best window**: when to observe, in local time. Grey bands on the charts are hours when the target is not observable.
 * **Mean score**: mean score of that window (0–1). Above ~0.7 is good.
-* **Robustness**: share of random weight sets that pick the same best hour. Higher means more certain.
+* **Confidence**: share of random weight sets that pick the same best hour. Higher means more certain.
 * **Score over time**: zero for hours that are not observable (sky too bright or target too low).
 * **Criteria**: the four criterion curves explain *why* an hour scores high or low.
-* **Pareto-optimal hours** and **Raw table**: expand for detailed numbers.
+* **Other good hours to consider**: hours that are the best at something (e.g. clearest sky), handy if your priorities differ. **Raw table**: every number.
 
 **4. FAQ**
 
@@ -162,9 +163,10 @@ GUIDE_VI = """
 * **Múi giờ (UTC+)**: ví dụ 7 cho Việt Nam, −5 cho New York (mùa đông).
 * **Chế độ offline**: bật khi không có mạng; ứng dụng dùng thời tiết *giả lập* và ghi rõ trên giao diện.
 
-**2. Điều chỉnh trọng số**
+**2. Chọn mục đích quan sát**
 
-Kéo các thanh trượt để nói cho SkyScore biết điều gì quan trọng với bạn. Tổng không cần bằng 1,
+Chọn ở ô **Bạn muốn quan sát gì?**, SkyScore sẽ tự đặt trọng số.
+Muốn chỉnh kỹ hơn? Mở **Tinh chỉnh trọng số (nâng cao)** và kéo các thanh trượt để nói cho SkyScore biết điều gì quan trọng với bạn. Tổng không cần bằng 1,
 ứng dụng tự chuẩn hoá. Ví dụ:
 
 | Mục đích | Gợi ý |
@@ -179,10 +181,10 @@ Kéo các thanh trượt để nói cho SkyScore biết điều gì quan trọng
 
 * **Cửa sổ tốt nhất**: khung giờ nên quan sát, theo giờ địa phương. Vùng tô xám trên biểu đồ là những giờ không quan sát được.
 * **Điểm trung bình**: điểm trung bình của khung giờ đó (0–1). Trên ~0.7 là tốt.
-* **Độ bền vững**: tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất. Càng cao càng chắc chắn.
+* **Độ tin cậy**: tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất. Càng cao càng chắc chắn.
 * **Điểm theo thời gian**: điểm bằng 0 ở những giờ không quan sát được (trời sáng hoặc mục tiêu quá thấp).
 * **Các tiêu chí**: bốn đường tiêu chí giúp hiểu *vì sao* một giờ được điểm cao hay thấp.
-* **Các giờ tối ưu Pareto** và **Bảng dữ liệu thô**: mở ra để xem số liệu chi tiết.
+* **Các giờ tốt khác đáng cân nhắc**: những giờ tốt nhất ở một mặt nào đó (ví dụ trời quang nhất), hữu ích khi ưu tiên của bạn khác. **Bảng dữ liệu thô**: toàn bộ số liệu.
 
 **4. Câu hỏi thường gặp**
 
@@ -202,10 +204,10 @@ TEXT = {
         "date": "Date (evening)",
         "offline": "Offline demo (synthetic weather)",
         "weights": "Weights",
-        "w_alt": "Altitude",
+        "w_alt": "Height in sky",
         "w_moon": "Moon darkness",
         "w_cloud": "Clear sky",
-        "w_see": "Seeing",
+        "w_see": "Steady air (seeing)",
         "window": "Window length (h)",
         "tabs": ["🔭 Planner", "ℹ️ About", "📖 Guide"],
         "intro": INTRO_EN,
@@ -215,14 +217,31 @@ TEXT = {
         "best": "Best window (local time)",
         "tz": "UTC offset (h)",
         "mean": "Mean score",
-        "robust": "Robustness of best hour",
-        "robust_help": "Share of random weight sets that pick the same best hour",
+        "robust": "Confidence",
+        "robust_help": "How often the same best hour wins when we try 500 random priority settings. Higher = more certain.",
         "never": "Target not observable on this date (sky not dark enough / target too low).",
         "sun_warning": "Never look at the Sun through a telescope, binoculars or with the naked eye without a certified solar filter.",
         "score_time": "Score over time",
         "criteria": "Criteria (0 = bad, 1 = good)",
         "seeing": "Predicted seeing (arcsec)",
-        "pareto": "Pareto-optimal hours",
+        "pareto": "Other good hours to consider (trade-offs)",
+        "pareto_help": "Each hour below is **unbeatable in at least one way**: no other hour is better on everything at once. "
+        "Use it if your priorities differ from the sliders: e.g. pick the hour that is best for *Clear sky* if clouds worry you most. "
+        "⭐ = inside the recommended window.",
+        "col_time": "Time", "col_score": "Score", "col_alt": "Height in sky", "col_cloud": "Clouds",
+        "col_seeing": "Seeing", "col_moon": "Moon darkness", "col_best": "Best hour for", "mix": "Good balance",
+        "verdict": "👉 **Go out {start} – {end}.** Conditions look **{q}** (score {s:.2f} / 1).",
+        "quality": ["poor", "fair", "good"],
+        "goal": "What do you want to observe?",
+        "goal_help": "Picks sensible weights for you. Fine-tune them below if you like.",
+        "presets": {"balanced": "Balanced (default)", "deep": "Faint galaxies & nebulae", "planets": "Planets & the Moon", "public": "Public / casual night"},
+        "fine_tune": "Fine-tune weights (advanced)",
+        "names": {"g_altitude": "Height in sky", "g_moon": "Moon darkness", "g_cloud": "Clear sky", "g_seeing": "Steady air"},
+        "seeing_help": "Lower is better: how much stars blur from air turbulence (arcseconds).",
+        "date_help": "The evening you plan to observe.",
+        "tz_help": "Hours ahead of UTC. Vietnam = 7.",
+        "lat_help": "Right-click a spot in Google Maps to copy its coordinates.",
+        "window_help": "How many hours in a row you plan to observe.",
         "raw": "Raw table",
         "save": "💾 Save tonight's predictions (CSV)",
         "info": "Weather: **{ws}** · Seeing labels: **{ls}** · CV MAE {mae:.2f}″, R² {r2:.2f}. "
@@ -240,7 +259,7 @@ TEXT = {
         "w_alt": "Độ cao",
         "w_moon": "Trăng tối",
         "w_cloud": "Trời quang",
-        "w_see": "Seeing",
+        "w_see": "Khí quyển ổn định (seeing)",
         "window": "Độ dài cửa sổ (giờ)",
         "tabs": ["🔭 Lập lịch", "ℹ️ Giới thiệu", "📖 Hướng dẫn"],
         "intro": INTRO_VI,
@@ -250,20 +269,52 @@ TEXT = {
         "best": "Cửa sổ tốt nhất (giờ địa phương)",
         "tz": "Múi giờ (UTC+)",
         "mean": "Điểm trung bình",
-        "robust": "Độ bền vững của giờ tốt nhất",
-        "robust_help": "Tỉ lệ bộ trọng số ngẫu nhiên cùng chọn giờ tốt nhất",
+        "robust": "Độ tin cậy",
+        "robust_help": "Tỉ lệ 500 bộ ưu tiên ngẫu nhiên vẫn chọn cùng giờ tốt nhất. Càng cao càng chắc chắn.",
         "never": "Mục tiêu không quan sát được vào ngày này (trời chưa đủ tối / mục tiêu quá thấp).",
         "sun_warning": "Tuyệt đối không nhìn Mặt Trời qua kính thiên văn, ống nhòm hay bằng mắt thường nếu không có kính lọc Mặt Trời đạt chuẩn.",
         "score_time": "Điểm theo thời gian",
         "criteria": "Các tiêu chí (0 = xấu, 1 = tốt)",
         "seeing": "Seeing dự đoán (arcsec)",
-        "pareto": "Các giờ tối ưu Pareto",
+        "pareto": "Các giờ tốt khác đáng cân nhắc (đánh đổi)",
+        "pareto_help": "Mỗi giờ dưới đây **không thể bị vượt mặt ở ít nhất một mặt**: không có giờ nào khác tốt hơn ở mọi tiêu chí cùng lúc. "
+        "Dùng bảng này nếu ưu tiên của bạn khác với thanh trượt: ví dụ lo mây nhất thì chọn giờ tốt nhất cho *Trời quang*. "
+        "⭐ = nằm trong khung giờ được khuyến nghị.",
+        "col_time": "Giờ", "col_score": "Điểm", "col_alt": "Độ cao", "col_cloud": "Mây",
+        "col_seeing": "Seeing", "col_moon": "Trăng tối", "col_best": "Tốt nhất về", "mix": "Cân bằng tốt",
+        "verdict": "👉 **Nên quan sát từ {start} – {end}.** Điều kiện **{q}** (điểm {s:.2f} / 1).",
+        "quality": ["kém", "tạm được", "tốt"],
+        "goal": "Bạn muốn quan sát gì?",
+        "goal_help": "Tự chọn trọng số phù hợp. Có thể tinh chỉnh bên dưới.",
+        "presets": {"balanced": "Cân bằng (mặc định)", "deep": "Thiên hà & tinh vân mờ", "planets": "Hành tinh & Mặt Trăng", "public": "Buổi quan sát công chúng"},
+        "fine_tune": "Tinh chỉnh trọng số (nâng cao)",
+        "names": {"g_altitude": "Độ cao", "g_moon": "Trăng tối", "g_cloud": "Trời quang", "g_seeing": "Khí quyển ổn định"},
+        "seeing_help": "Càng thấp càng tốt: mức nhoè của sao do nhiễu loạn không khí (giây cung).",
+        "date_help": "Buổi tối bạn định quan sát.",
+        "tz_help": "Số giờ chênh với UTC. Việt Nam = 7.",
+        "lat_help": "Nhấp chuột phải trên Google Maps để lấy toạ độ.",
+        "window_help": "Số giờ liên tiếp bạn định quan sát.",
         "raw": "Bảng dữ liệu thô",
         "save": "💾 Lưu dữ liệu dự đoán đêm nay (CSV)",
         "info": "Thời tiết: **{ws}** · Nhãn seeing: **{ls}** · CV MAE {mae:.2f}″, R² {r2:.2f}. "
         "Mô hình seeing học từ nhãn giả lập cho tới khi được thay bằng nhật ký quan sát thật.",
     },
 }
+
+PRESETS = {  # altitude, moon, cloud, seeing
+    "balanced": (0.35, 0.20, 0.30, 0.15),
+    "deep": (0.25, 0.35, 0.30, 0.10),
+    "planets": (0.35, 0.05, 0.25, 0.35),
+    "public": (0.25, 0.10, 0.55, 0.10),
+}
+W_KEYS = ["w_alt", "w_moon", "w_cloud", "w_see"]
+for k, v in zip(W_KEYS, PRESETS["balanced"]):
+    st.session_state.setdefault(k, v)
+
+
+def apply_preset():
+    st.session_state.update(zip(W_KEYS, PRESETS[st.session_state.preset]))
+
 
 with st.sidebar:
     lang = st.radio(
@@ -275,19 +326,21 @@ with st.sidebar:
     T = TEXT[lang]
 
     st.header(T["site"])
-    lat = st.number_input(T["lat"], -90.0, 90.0, 10.78, 0.01, key="lat")
-    lon = st.number_input(T["lon"], -180.0, 180.0, 106.70, 0.01, key="lon")
+    lat = st.number_input(T["lat"], -90.0, 90.0, 10.78, 0.01, key="lat", help=T["lat_help"])
+    lon = st.number_input(T["lon"], -180.0, 180.0, 106.70, 0.01, key="lon", help=T["lat_help"])
     target = st.selectbox(T["target"], TARGETS, key="target")
-    date = st.date_input(T["date"], pd.Timestamp.now().date(), key="date")
-    tz = st.number_input(T["tz"], -12.0, 14.0, 7.0, 0.5, key="tz")
+    date = st.date_input(T["date"], pd.Timestamp.now().date(), key="date", help=T["date_help"])
+    tz = st.number_input(T["tz"], -12.0, 14.0, 7.0, 0.5, key="tz", help=T["tz_help"])
     offline = st.checkbox(T["offline"], value=False, key="offline")
 
     st.header(T["weights"])
-    w_alt = st.slider(T["w_alt"], 0.0, 1.0, 0.35, 0.05, key="w_alt")
-    w_moon = st.slider(T["w_moon"], 0.0, 1.0, 0.20, 0.05, key="w_moon")
-    w_cloud = st.slider(T["w_cloud"], 0.0, 1.0, 0.30, 0.05, key="w_cloud")
-    w_see = st.slider(T["w_see"], 0.0, 1.0, 0.15, 0.05, key="w_see")
-    window = st.slider(T["window"], 1, 6, 3, key="window")
+    st.selectbox(T["goal"], list(PRESETS), format_func=T["presets"].get, key="preset", on_change=apply_preset, help=T["goal_help"])
+    window = st.slider(T["window"], 1, 6, 3, key="window", help=T["window_help"])
+    with st.expander(T["fine_tune"]):
+        w_alt = st.slider(T["w_alt"], 0.0, 1.0, step=0.05, key="w_alt")
+        w_moon = st.slider(T["w_moon"], 0.0, 1.0, step=0.05, key="w_moon")
+        w_cloud = st.slider(T["w_cloud"], 0.0, 1.0, step=0.05, key="w_cloud")
+        w_see = st.slider(T["w_see"], 0.0, 1.0, step=0.05, key="w_see", help=T["seeing_help"])
 
 st.title("🔭 SkyScore")
 st.caption(T["caption"])
@@ -320,6 +373,9 @@ with tab_plan:
         c2.metric(T["mean"], f"{mean_s:.2f}")
         freq = robust_best_hours(df)
         c3.metric(T["robust"], f"{freq.max():.0%}", help=T["robust_help"])
+        q = T["quality"][int(mean_s >= 0.5) + int(mean_s >= 0.7)]
+        span = f"{start + to_local:%H:%M}", f"{end + to_local + pd.Timedelta(hours=1):%H:%M}"
+        st.success(T["verdict"].format(start=span[0], end=span[1], q=q, s=mean_s))
     else:
         c1.error(T["never"])
 
@@ -329,13 +385,40 @@ with tab_plan:
     left, right = st.columns(2)
     with left:
         st.subheader(T["criteria"])
-        st.altair_chart(night_chart(df, ["g_altitude", "g_moon", "g_cloud", "g_seeing"], labels), use_container_width=True)
+        names = T["names"]
+        st.altair_chart(night_chart(df.rename(columns=names), list(names.values()), labels), use_container_width=True)
     with right:
         st.subheader(T["seeing"])
-        st.altair_chart(night_chart(df, ["seeing_arcsec"], labels), use_container_width=True)
+        st.altair_chart(night_chart(df.rename(columns={"seeing_arcsec": "Seeing"}), ["Seeing"], labels), use_container_width=True)
 
-    with st.expander(T["pareto"]):
-        st.dataframe(pareto_front(df).round(2))
+    pf = pareto_front(df)
+    if len(pf):  # empty when nothing is observable, so start/end below are defined
+        with st.expander(T["pareto"]):
+            st.markdown(T["pareto_help"])
+            crit = list(T["names"])
+            is_best = pf[crit].eq(pf[crit].max())
+            in_win = (pf.index >= start) & (pf.index <= end)
+            pct = st.column_config.ProgressColumn(min_value=0, max_value=1, format="%.2f")
+            st.dataframe(
+                pd.DataFrame({
+                    T["col_time"]: [("⭐ " if w else "") + f"{t + to_local:%H:%M}" for t, w in zip(pf.index, in_win)],
+                    T["col_score"]: pf["score"].to_numpy(),
+                    T["col_best"]: [", ".join(T["names"][c] for c in crit if r[c]) or T["mix"] for _, r in is_best.iterrows()],
+                    T["col_alt"]: pf["target_alt"].to_numpy(),
+                    T["col_cloud"]: pf["cloud_cover"].to_numpy(),
+                    T["col_seeing"]: pf["seeing_arcsec"].to_numpy(),
+                    T["col_moon"]: pf["g_moon"].to_numpy(),
+                }),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    T["col_score"]: pct,
+                    T["col_moon"]: pct,
+                    T["col_alt"]: st.column_config.NumberColumn(format="%.0f°"),
+                    T["col_cloud"]: st.column_config.NumberColumn(format="%.0f%%"),
+                    T["col_seeing"]: st.column_config.NumberColumn(format="%.1f″", help=T["seeing_help"]),
+                },
+            )
     with st.expander(T["raw"]):
         st.dataframe(df.round(2))
 
