@@ -66,24 +66,25 @@ PYTHONPATH=src python -m skyscore.evaluation data/events.csv data/observations.c
 
 | Metric | SkyScore | Baseline |
 |---|---|---|
-| Seeing rank correlation (Spearman, 1–5 scale) | −0.18 | 0 (no skill) |
+| Seeing rank correlation (Spearman, 1–5 scale) | −0.28 | 0 (no skill) |
 | Seeing MAE, FWHM hours (″) | n/a (no FWHM measurements yet) | n/a |
-| Cloud MAE (%) | 61.2 | 10.6 (climatology) |
-| Observing rating at the recommended hour (1–5) | 3.97 | 3.97 (random logged hour) |
+| Cloud MAE (%) | 9.4 | 24.4 (climatology) |
+| Observing rating at the recommended hour (1–5) | 3.47 | 3.47 (random logged hour) |
 
 The baseline is climatology (always predict the average) because measurements of the same night are not available when the plan is made.
 
-Results above: 7 events, archived Open-Meteo forecasts. Each event lasted 2–3 hours, but conditions were logged once per event as a summary of the whole session, timed at its midpoint (e.g. 20:00 for 19:00–21:00; cloud estimated by eye), and compared with the forecast averaged over the session (`duration_h`, provisionally 2 h for every event). So there are only 7 logged rows. **This is too little data for any conclusion.** With one logged hour per event the recommended hour and a random hour are the same hour, so the rating row cannot show skill; the seeing correlation on 7 points is indistinguishable from noise. The one clear signal is cloud: the session-averaged forecast said 55–100 % while observers logged 10–50 %, likely because Open-Meteo's total `cloud_cover` includes thin high cirrus that still allows observing in the tropics. Future logs should record every hour of an event, including bad ones.
+Results above: 12 events, archived Open-Meteo forecasts. Conditions were logged once per event as a summary of the whole session (1–3 h), timed at its midpoint (e.g. 20:00 for 19:00–21:00; cloud estimated by eye), and compared with the forecast averaged over the same session (`duration_h`). So there are only 12 logged rows. **This is too little data for firm conclusions.** Cloud is the encouraging signal: the session-averaged forecast was within about 9 percentage points of what observers saw, clearly better than guessing the average. Seeing shows no skill yet (the model is still trained on proxy labels). With one logged hour per event the recommended hour and a random hour are the same hour, so the rating row cannot show skill. Future logs should record every hour of an event, including bad ones.
 
 **To make the model scientifically meaningful**, replace the labels with real measurements, for example the club's own observing logs (estimated seeing from double-star splitting or star FWHM in images), merged with archived weather for the same hours, and call `SeeingModel.fit(X, y, label_source="club logs")`. With real labels, report the CV error against a persistence/climatology baseline.
 
 ## Real-world use
 
-SkyScore has been used at 8 logged observing events, all run by the USAC astronomy club (two co-hosted with KOCUN Cần Thơ and SEAC, International University):
+SkyScore has been used at 12 logged observing events run by two astronomy clubs (some co-hosted with KOCUN Cần Thơ, SEAC International University and SciLife TEAClub):
 
 | Club | Since | Members | Events |
 |---|---|---|---|
 | CLB Thiên văn USAC | 2025-03 | ~60 (2025 board term) | 8 (incl. 1 with KOCUN Cần Thơ, 1 with SEAC) |
+| PTNK Astronomy Club | — | — | 4 (incl. 2 with SciLife TEAClub) |
 
 Event-by-event details are in [`data/events.csv`](data/events.csv).
 

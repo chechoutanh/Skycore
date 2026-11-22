@@ -30,6 +30,19 @@ from .weather import get_forecast
 SEEING_METHODS = {"fwhm_arcsec": False, "pickering_1_10": True, "scale_1_5": True}
 
 
+def session_midpoint(start: str, end: str) -> tuple[str, float]:
+    """('19:00', '21:00') -> ('20:00', 2.0): the logs store a session as its midpoint plus its length.
+
+    An end at or before the start means the session ran past midnight.
+    """
+    a, b = (pd.Timedelta(f"{s.strip()}:00") for s in (start, end))
+    if b <= a:
+        b += pd.Timedelta(days=1)
+    mid = (a + (b - a) / 2) % pd.Timedelta(days=1)
+    minutes = int(mid.total_seconds() // 60)
+    return f"{minutes // 60:02d}:{minutes % 60:02d}", (b - a).total_seconds() / 3600
+
+
 def load_logs(events_path: str, observations_path: str) -> pd.DataFrame:
     """Join the two logs and convert local observing times to naive UTC."""
     ev = pd.read_csv(events_path)

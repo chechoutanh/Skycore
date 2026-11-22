@@ -15,9 +15,12 @@ Real measurements from club observing events, used by `python -m skyscore.evalua
 | `target` | M42 (Orion Nebula) | Must be one of the targets in the app (used for altitude/Moon) |
 | `other_targets` | Jupiter; M45 | Free text |
 | `equipment` | 8" Dobsonian, f=1200 mm, ZWO ASI585MC | Focal length + camera if seeing was measured from images |
-| `participants` | 35 | |
+| `participants` | 35 | People who joined the club's own activities (approx. is fine: `~40+`) |
+| `event_participants` | 4500+ | Everyone at the event, as published by the organisers. Same as `participants` for the club's own sessions |
 | `recommended_window` | 21:00-23:00 | Local time SkyScore suggested |
 | `prediction_saved` | yes / no | Was the recommendation saved **before** the event? |
+| `source_url` | https://www.facebook.com/share/p/... | Optional. The club's post about the event, linked in the app |
+| `event_name` | Trung thu Lãm nguyệt USAC x SEAC | Optional. Shown as the session title in the app |
 
 ## `observations.csv`: one row per observed hour
 

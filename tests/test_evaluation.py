@@ -3,7 +3,7 @@ import pytest
 
 pytest.importorskip("astropy")
 
-from skyscore.evaluation import add_predictions, evaluate, load_logs  # noqa: E402
+from skyscore.evaluation import add_predictions, evaluate, load_logs, session_midpoint  # noqa: E402
 from skyscore.seeing_model import SeeingModel, simulated_training_set  # noqa: E402
 
 
@@ -72,3 +72,12 @@ def test_duration_averages_forecast_over_session(tmp_path):
     # 20:00 with a 2 h session covers 19:00-21:00, so it equals the mean of those three hours.
     for col in ["cloud_forecast", "seeing_pred", "score"]:
         assert df[col].iloc[3] == pytest.approx(df[col].iloc[:3].mean())
+
+
+@pytest.mark.parametrize(
+    "start,end,expected",
+    [("19:00", "21:00", ("20:00", 2.0)), ("8:00", "11:00", ("09:30", 3.0)),
+     ("11:30", "14:00", ("12:45", 2.5)), ("23:00", "01:00", ("00:00", 2.0))],
+)
+def test_session_midpoint(start, end, expected):
+    assert session_midpoint(start, end) == expected

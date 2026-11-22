@@ -12,7 +12,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from skyscore.astro import TARGETS  # noqa: E402
-from skyscore.evaluation import add_predictions, evaluate, load_logs  # noqa: E402
+from skyscore.evaluation import add_predictions, evaluate, load_logs, session_midpoint  # noqa: E402
 from skyscore.pipeline import build_table  # noqa: E402
 from skyscore.scoring import SEEING_BEST, SEEING_WORST, Weights, best_window, minmax, pareto_front, robust_best_hours  # noqa: E402
 from skyscore.seeing_model import train_default  # noqa: E402
@@ -264,8 +264,11 @@ TEXT = {
         "window": "Window length (h)",
         "tabs": ["🔭 Planner", "🌟 Our stargazing nights", "📝 Observing log", "ℹ️ About", "📖 Guide"],
         "nights_intro": "Public stargazing sessions run by our club: who came, where, and what we looked at.",
-        "nights_events": "Sessions", "nights_people": "People reached (approx.)", "nights_places": "Places",
-        "nights_used": "🔭 SkyScore was used to pick the time for this session (suggested window: {w}).",
+        "nights_events": "Sessions", "nights_people": "Reached by the club", "nights_places": "Places",
+        "nights_people_help": "People who joined the club's own activities (approx.).",
+        "nights_crowd": "Total event attendance", "nights_crowd_help": "Everyone at the events, as reported by the organisers (approx.).",
+        "nights_post": "📎 Read the club's post", "nights_window": " Suggested window: {w}.",
+        "nights_used": "🔭 SkyScore was used to pick the time for this session.",
         "nights_people_one": "{n} participants",
         "nights_empty": "No photos yet. Put photos for a session in `photos/<event_id>/` "
         "(for example `photos/E01/`) with `python -m skyscore.photos <photo folder> E01`: "
@@ -275,15 +278,37 @@ TEXT = {
         "log_pw": "🔒 Owner password", "log_pw_bad": "Wrong password.",
         "log_no_pw": "🔒 Saved entries are private. To view them, the owner sets `log_password` in `.streamlit/secrets.toml` "
         "(or in the app's Secrets on Streamlit Cloud).",
-        "log_from_sidebar": "Site, target and date come from the sidebar: **{target}**, {date}, ({lat:.2f}, {lon:.2f}), UTC{tz:+g}.",
-        "log_site": "Place name", "log_club": "Club / observer",
-        "log_time": "Time observed (local)", "log_duration": "How long (h)",
-        "log_seeing": "How steady were the stars?", "log_seeing_help": "1 = boiling, very blurry · 5 = rock steady, sharp",
+        "f": {
+            "sec_event": "#### 1. About the session",
+            "event_name": "Event name", "event_name_ph": "e.g. Mid-Autumn Moon night",
+            "date": "Date", "date_help": "Local date of the EVENING the session started (a session past midnight keeps that evening's date).",
+            "club": "Club *", "site": "Place *",
+            "lat": "Latitude (°)", "lon": "Longitude (°)",
+            "target": "Main target", "target_help": "Not in the list? Pick the closest one you observed and write the real one under Other targets.",
+            "other_targets": "Other targets", "equipment": "Equipment",
+            "equipment_help": "Telescope, focal length (mm), camera. Focal length and camera are needed if seeing was measured from images.",
+            "participants": "People reached by the club", "participants_help": "People who joined the club's own activities. Approximate is fine: 40+",
+            "event_participants": "Total event attendance", "event_participants_help": "Everyone at the event, as published by the organisers. Same as above for the club's own sessions.",
+            "prediction_saved": "Was SkyScore's suggestion saved BEFORE the session?",
+            "prediction_saved_help": "yes = saved or screenshotted before; no = SkyScore was run afterwards. Please be honest.",
+            "yesno": {"yes": "Yes", "no": "No"},
+            "recommended_window": "Window SkyScore suggested (local)",
+            "source_url": "Link to the club's post (optional)",
+            "sec_obs": "#### 2. Conditions you observed",
+            "start": "Start (local)", "end": "End (local)", "end_help": "An end before the start means the session ran past midnight.",
+            "seeing_method": "How seeing was measured",
+            "methods": {"scale_1_5": "By eye, 1–5 (5 = steadiest)", "pickering_1_10": "Pickering scale 1–10 (10 = best)",
+                        "fwhm_arcsec": "From images, FWHM in arcsec (smaller = better)"},
+            "seeing_value": "Seeing value", "seeing_value_help": "On the scale chosen on the left. FWHM to arcsec = FWHM_px × 206.265 × pixel_µm ÷ focal_mm.",
+            "transparency": "Transparency (optional)", "transparency_help": "Faintest naked-eye star magnitude, or an SQM reading.",
+            "err_required": "Please fill in Club and Place.", "err_seeing": "Seeing value must be between {lo:g} and {hi:g} on this scale.",
+            "err_url": "The link must start with https://", "err_number": "Transparency must be a number (use a dot: 5.5).",
+        },
         "log_quality": "Overall, how good was it?", "log_quality_help": "1 = useless · 5 = excellent",
         "log_cloud": "Sky covered by cloud (%)",
         "log_wind": "Wind", "wind": {"calm": "Calm", "light": "Light", "strong": "Strong (shook the telescope)"},
         "log_notes": "Notes (optional)", "log_submit": "💾 Save this entry",
-        "log_saved": "Saved to session {eid}. Logging another hour of the same night? Change the time and save again.",
+        "log_saved": "Saved to session {eid}. Logging another time block of the same session? Keep the details, change the times and save again.",
         "log_cloud_warn": "Note: on a hosted app (e.g. Streamlit Cloud) saved entries can disappear on restart. Download the CSV files below to keep them.",
         "log_table": "🔒 Saved entries ({n}), owner only",
         "log_dl_events": "⬇️ events.csv", "log_dl_obs": "⬇️ observations.csv",
@@ -356,8 +381,11 @@ TEXT = {
         "window": "Độ dài cửa sổ (giờ)",
         "tabs": ["🔭 Lập lịch", "🌟 Những buổi ngắm sao", "📝 Nhật ký quan sát", "ℹ️ Giới thiệu", "📖 Hướng dẫn"],
         "nights_intro": "Các buổi ngắm sao cộng đồng do CLB tổ chức: ai đã tham gia, ở đâu, và đã quan sát gì.",
-        "nights_events": "Số buổi", "nights_people": "Số người tham gia (ước tính)", "nights_places": "Số địa điểm",
-        "nights_used": "🔭 Buổi này đã dùng SkyScore để chọn giờ (khung giờ gợi ý: {w}).",
+        "nights_events": "Số buổi", "nights_people": "Người CLB tiếp cận", "nights_places": "Số địa điểm",
+        "nights_people_help": "Số người tham gia trực tiếp hoạt động của CLB (ước tính).",
+        "nights_crowd": "Tổng người dự sự kiện", "nights_crowd_help": "Toàn bộ người dự sự kiện, theo số liệu ban tổ chức công bố (ước tính).",
+        "nights_post": "📎 Xem bài đăng của CLB", "nights_window": " Khung giờ gợi ý: {w}.",
+        "nights_used": "🔭 Buổi này đã dùng SkyScore để chọn giờ.",
         "nights_people_one": "{n} người tham gia",
         "nights_empty": "Chưa có ảnh. Đặt ảnh của mỗi buổi vào `photos/<mã buổi>/` "
         "(ví dụ `photos/E01/`) bằng lệnh `python -m skyscore.photos <thư mục ảnh> E01`: "
@@ -367,15 +395,37 @@ TEXT = {
         "log_pw": "🔒 Mật khẩu chủ sở hữu", "log_pw_bad": "Sai mật khẩu.",
         "log_no_pw": "🔒 Dữ liệu đã lưu là riêng tư. Để xem, chủ sở hữu đặt `log_password` trong `.streamlit/secrets.toml` "
         "(hoặc mục Secrets của app trên Streamlit Cloud).",
-        "log_from_sidebar": "Địa điểm, mục tiêu và ngày lấy từ thanh bên: **{target}**, {date}, ({lat:.2f}, {lon:.2f}), UTC{tz:+g}.",
-        "log_site": "Tên địa điểm", "log_club": "CLB / người quan sát",
-        "log_time": "Giờ quan sát (địa phương)", "log_duration": "Kéo dài (giờ)",
-        "log_seeing": "Sao có ổn định không?", "log_seeing_help": "1 = rung mạnh, rất nhoè · 5 = đứng yên, rất nét",
+        "f": {
+            "sec_event": "#### 1. Thông tin buổi",
+            "event_name": "Tên sự kiện", "event_name_ph": "ví dụ: Trung thu Lãm nguyệt",
+            "date": "Ngày", "date_help": "Ngày địa phương của BUỔI TỐI bắt đầu (buổi kéo qua nửa đêm vẫn ghi ngày của buổi tối).",
+            "club": "CLB *", "site": "Địa điểm *",
+            "lat": "Vĩ độ (°)", "lon": "Kinh độ (°)",
+            "target": "Mục tiêu chính", "target_help": "Không có trong danh sách? Chọn mục tiêu gần nhất đã quan sát và ghi mục tiêu thật ở Mục tiêu khác.",
+            "other_targets": "Mục tiêu khác", "equipment": "Thiết bị",
+            "equipment_help": "Kính, tiêu cự (mm), camera. Cần tiêu cự và camera nếu đo seeing từ ảnh.",
+            "participants": "Số người CLB tiếp cận", "participants_help": "Số người tham gia trực tiếp hoạt động của CLB. Ghi ước lượng cũng được: 40+",
+            "event_participants": "Tổng người dự sự kiện", "event_participants_help": "Toàn bộ người dự sự kiện, theo số ban tổ chức công bố. Buổi CLB tự tổ chức thì ghi giống ô bên trái.",
+            "prediction_saved": "Gợi ý của SkyScore có được lưu TRƯỚC buổi quan sát không?",
+            "prediction_saved_help": "Có = đã lưu/chụp màn hình trước buổi; Không = chạy SkyScore sau buổi. Ghi trung thực.",
+            "yesno": {"yes": "Có", "no": "Không"},
+            "recommended_window": "Khung giờ SkyScore gợi ý (giờ địa phương)",
+            "source_url": "Link bài đăng của CLB (không bắt buộc)",
+            "sec_obs": "#### 2. Điều kiện quan sát thực tế",
+            "start": "Bắt đầu (giờ địa phương)", "end": "Kết thúc (giờ địa phương)", "end_help": "Giờ kết thúc sớm hơn giờ bắt đầu = buổi kéo qua nửa đêm.",
+            "seeing_method": "Cách đo seeing",
+            "methods": {"scale_1_5": "Bằng mắt, thang 1–5 (5 = ổn định nhất)", "pickering_1_10": "Thang Pickering 1–10 (10 = tốt nhất)",
+                        "fwhm_arcsec": "Từ ảnh, FWHM giây cung (càng nhỏ càng tốt)"},
+            "seeing_value": "Giá trị seeing", "seeing_value_help": "Theo thang đã chọn bên trái. FWHM ra giây cung = FWHM_px × 206.265 × pixel_µm ÷ tiêu_cự_mm.",
+            "transparency": "Độ trong (không bắt buộc)", "transparency_help": "Cấp sao mờ nhất thấy bằng mắt thường, hoặc số đo SQM.",
+            "err_required": "Hãy điền CLB và Địa điểm.", "err_seeing": "Giá trị seeing phải từ {lo:g} đến {hi:g} theo thang này.",
+            "err_url": "Link phải bắt đầu bằng https://", "err_number": "Độ trong phải là số (dùng dấu chấm: 5.5).",
+        },
         "log_quality": "Đánh giá chung buổi quan sát", "log_quality_help": "1 = không xem được gì · 5 = tuyệt vời",
         "log_cloud": "Phần trời bị mây che (%)",
         "log_wind": "Gió", "wind": {"calm": "Lặng", "light": "Nhẹ", "strong": "Mạnh (làm rung kính)"},
         "log_notes": "Ghi chú (không bắt buộc)", "log_submit": "💾 Lưu mục này",
-        "log_saved": "Đã lưu vào buổi {eid}. Muốn ghi thêm giờ khác của cùng đêm? Đổi giờ rồi lưu tiếp.",
+        "log_saved": "Đã lưu vào buổi {eid}. Muốn ghi thêm khung giờ khác của cùng buổi? Giữ nguyên thông tin, đổi giờ rồi lưu tiếp.",
         "log_cloud_warn": "Lưu ý: nếu app chạy trên máy chủ (ví dụ Streamlit Cloud), dữ liệu đã lưu có thể mất khi khởi động lại. Hãy tải các file CSV bên dưới để giữ lại.",
         "log_table": "🔒 Dữ liệu đã lưu ({n} mục), chỉ chủ sở hữu",
         "log_dl_events": "⬇️ events.csv", "log_dl_obs": "⬇️ observations.csv",
@@ -503,11 +553,15 @@ tab_plan, tab_nights, tab_log, tab_intro, tab_guide = st.tabs(T["tabs"])
 with tab_nights:
     st.markdown(T["nights_intro"])
     ev = pd.read_csv(EVENTS).sort_values("date", ascending=False)
-    people = pd.to_numeric(ev["participants"].astype(str).str.extract(r"(\d+)")[0], errors="coerce")  # "~40" -> 40
-    a, b, c = st.columns(3)
+    def count(col):  # "~40+" -> 40; missing column or text -> NaN
+        return pd.to_numeric(ev.get(col, pd.Series(index=ev.index, dtype=str)).astype(str).str.extract(r"(\d+)")[0], errors="coerce")
+
+    people, crowd = count("participants"), count("event_participants")
+    a, b, c, d = st.columns(4)
     a.metric(T["nights_events"], len(ev))
-    b.metric(T["nights_people"], f"{int(people.sum())}+")
-    c.metric(T["nights_places"], ev["site"].nunique())
+    b.metric(T["nights_people"], f"{int(people.sum())}+", help=T["nights_people_help"])
+    c.metric(T["nights_crowd"], f"{int(crowd.sum())}+", help=T["nights_crowd_help"])
+    d.metric(T["nights_places"], ev["site"].nunique())
     shown = 0
     for (_, e), n in zip(ev.iterrows(), people):
         pics = sorted(p for p in (PHOTOS / str(e["event_id"])).glob("*") if p.suffix.lower() in IMG_EXTS)
@@ -515,37 +569,85 @@ with tab_nights:
             continue
         shown += 1
         st.divider()
-        st.subheader(e["site"])
+        name = e.get("event_name")
+        has_name = isinstance(name, str) and name.strip()
+        st.subheader(name if has_name else e["site"])
         looked_at = ", ".join(x for x in (e["target"], e["other_targets"]) if isinstance(x, str) and x.strip())
-        facts = [e["date"], e["club"], T["nights_people_one"].format(n=e["participants"]) if pd.notna(n) else None, f"🔭 {looked_at}" if looked_at else None]
+        facts = [e["date"], e["site"] if has_name else None, e["club"],
+                 T["nights_people_one"].format(n=e["participants"]) if pd.notna(n) else None,
+                 f"🔭 {looked_at}" if looked_at else None]
         st.caption(" · ".join(str(x) for x in facts if isinstance(x, str) and x))
+        url = e.get("source_url")
+        if isinstance(url, str) and url.startswith("https://"):
+            st.markdown(f"[{T['nights_post']}]({url})")
         if str(e["prediction_saved"]).strip().lower() == "yes":
-            st.success(T["nights_used"].format(w=e["recommended_window"]))
+            w = e["recommended_window"]
+            st.success(T["nights_used"] + (T["nights_window"].format(w=w) if isinstance(w, str) and w.strip() else ""))
         cols = st.columns(3)
         for i, p in enumerate(pics):
-            cols[i % 3].image(str(p), use_container_width=True)
+            cols[i % 3].image(str(p), width="stretch")
     if not shown:
         st.info(T["nights_empty"])
 
 with tab_log:
     st.markdown(T["log_intro"])
-    st.caption(T["log_from_sidebar"].format(target=target, date=date, lat=lat, lon=lon, tz=tz))
-    with st.form("log", clear_on_submit=True):
+    F = T["f"]
+    # Same fields as the club's Google Sheet (tabs events + observations); sidebar values are only defaults.
+    with st.form("log"):
+        st.markdown(F["sec_event"])
         a, b = st.columns(2)
-        site = a.text_input(T["log_site"])
-        club = b.text_input(T["log_club"])
-        obs_time = a.time_input(T["log_time"], dtime(21, 0), step=1800)
-        duration = b.number_input(T["log_duration"], 0.5, 12.0, 1.0, 0.5)
-        seeing = a.select_slider(T["log_seeing"], [1, 2, 3, 4, 5], 3, help=T["log_seeing_help"])
-        quality = b.select_slider(T["log_quality"], [1, 2, 3, 4, 5], 3, help=T["log_quality_help"])
-        cloud = a.slider(T["log_cloud"], 0, 100, 0, 10)
+        ev_name = a.text_input(F["event_name"], placeholder=F["event_name_ph"])
+        ev_date = b.date_input(F["date"], date, help=F["date_help"])
+        club = a.text_input(F["club"])
+        site = b.text_input(F["site"])
+        ev_lat = a.number_input(F["lat"], -90.0, 90.0, float(lat), format="%.4f", help=T["lat_help"])
+        ev_lon = b.number_input(F["lon"], -180.0, 180.0, float(lon), format="%.4f", help=T["lat_help"])
+        ev_tz = a.number_input(T["tz"], -12.0, 14.0, float(tz), 0.5, help=T["tz_help"])
+        ev_target = b.selectbox(F["target"], TARGETS, index=TARGETS.index(target), help=F["target_help"])
+        others = st.text_input(F["other_targets"], placeholder="Jupiter; M45")
+        equipment = st.text_input(F["equipment"], placeholder="Dobson 8 inch, f=1200 mm, ZWO ASI585MC", help=F["equipment_help"])
+        a, b = st.columns(2)
+        people = a.text_input(F["participants"], placeholder="30", help=F["participants_help"])
+        crowd = b.text_input(F["event_participants"], placeholder="300+", help=F["event_participants_help"])
+        saved = a.radio(F["prediction_saved"], ["yes", "no"], index=1, format_func=F["yesno"].get, horizontal=True,
+                        help=F["prediction_saved_help"])
+        window_txt = b.text_input(F["recommended_window"], placeholder="20:00-23:00")
+        url = st.text_input(F["source_url"], placeholder="https://www.facebook.com/...")
+
+        st.markdown(F["sec_obs"])
+        a, b = st.columns(2)
+        t0 = a.time_input(F["start"], dtime(19, 0), step=900)
+        t1 = b.time_input(F["end"], dtime(21, 0), step=900, help=F["end_help"])
+        method = a.selectbox(F["seeing_method"], list(F["methods"]), format_func=F["methods"].get)
+        seeing = b.number_input(F["seeing_value"], 0.0, 10.0, 3.0, 0.1, help=F["seeing_value_help"])
+        cloud = a.slider(T["log_cloud"], 0, 100, 0, 5)
+        quality = b.slider(T["log_quality"], 1.0, 5.0, 3.0, 0.1, help=T["log_quality_help"])
+        transparency = a.text_input(F["transparency"], help=F["transparency_help"])
         wind = b.radio(T["log_wind"], list(T["wind"]), format_func=T["wind"].get, horizontal=True)
         notes = st.text_input(T["log_notes"])
-        if st.form_submit_button(T["log_submit"], type="primary"):
+        submitted = st.form_submit_button(T["log_submit"], type="primary")
+    if submitted:
+        lo, hi = {"scale_1_5": (1, 5), "pickering_1_10": (1, 10), "fwhm_arcsec": (0.3, 10)}[method]
+        errors = [F["err_required"]] if not (club.strip() and site.strip()) else []
+        if not lo <= seeing <= hi:
+            errors.append(F["err_seeing"].format(lo=lo, hi=hi))
+        if url.strip() and not url.strip().startswith("https://"):
+            errors.append(F["err_url"])
+        if transparency.strip() and pd.isna(pd.to_numeric(transparency.strip(), errors="coerce")):
+            errors.append(F["err_number"])
+        for err in errors:
+            st.error(err)
+        if not errors:
+            mid, hours = session_midpoint(f"{t0:%H:%M}", f"{t1:%H:%M}")
             eid = save_log(
-                {"date": f"{date:%Y-%m-%d}", "club": club, "site": site, "lat": lat, "lon": lon, "utc_offset": tz, "target": target},
-                {"time": f"{obs_time:%H:%M}", "duration_h": duration, "seeing_value": seeing, "seeing_method": "scale_1_5",
-                 "cloud_observed": cloud, "quality_rating": quality, "wind_feel": wind, "notes": notes},
+                {"date": f"{ev_date:%Y-%m-%d}", "club": club.strip(), "site": site.strip(), "lat": ev_lat, "lon": ev_lon,
+                 "utc_offset": ev_tz, "target": ev_target, "other_targets": others.strip(), "equipment": equipment.strip(),
+                 "participants": people.strip(), "event_participants": crowd.strip(),
+                 "recommended_window": window_txt.strip(), "prediction_saved": saved,
+                 "source_url": url.strip(), "event_name": ev_name.strip()},
+                {"time": mid, "duration_h": hours, "seeing_value": seeing, "seeing_method": method,
+                 "cloud_observed": cloud, "quality_rating": quality, "transparency": transparency.strip(),
+                 "wind_feel": wind, "notes": notes.strip()},
             )
             st.success(T["log_saved"].format(eid=eid))
 
@@ -637,16 +739,16 @@ with tab_plan:
         c1.error(T["never"])
 
     st.subheader(T["score_time"])
-    st.altair_chart(night_chart(df.rename(columns={"score": T["col_score"]}), [T["col_score"]], labels), use_container_width=True)
+    st.altair_chart(night_chart(df.rename(columns={"score": T["col_score"]}), [T["col_score"]], labels), width="stretch")
 
     left, right = st.columns(2)
     with left:
         st.subheader(T["criteria"])
         names = T["names"]
-        st.altair_chart(night_chart(df.rename(columns=names), list(names.values()), labels), use_container_width=True)
+        st.altair_chart(night_chart(df.rename(columns=names), list(names.values()), labels), width="stretch")
     with right:
         st.subheader(T["seeing"])
-        st.altair_chart(night_chart(df.rename(columns={"seeing_arcsec": "Seeing"}), ["Seeing"], labels), use_container_width=True)
+        st.altair_chart(night_chart(df.rename(columns={"seeing_arcsec": "Seeing"}), ["Seeing"], labels), width="stretch")
 
     pf = pareto_front(df)
     if len(pf):  # empty when nothing is observable, so start/end below are defined
@@ -667,7 +769,7 @@ with tab_plan:
                     T["col_moon"]: pf["g_moon"].to_numpy(),
                 }),
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
                 column_config={
                     T["col_score"]: pct,
                     T["col_moon"]: pct,
