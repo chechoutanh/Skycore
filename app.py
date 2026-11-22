@@ -224,6 +224,7 @@ TEXT = {
         "seeing": "Predicted seeing (arcsec)",
         "pareto": "Pareto-optimal hours",
         "raw": "Raw table",
+        "save": "💾 Save tonight's predictions (CSV)",
         "info": "Weather: **{ws}** · Seeing labels: **{ls}** · CV MAE {mae:.2f}″, R² {r2:.2f}. "
         "Seeing model trained on proxy labels unless replaced with real observing logs.",
     },
@@ -258,6 +259,7 @@ TEXT = {
         "seeing": "Seeing dự đoán (arcsec)",
         "pareto": "Các giờ tối ưu Pareto",
         "raw": "Bảng dữ liệu thô",
+        "save": "💾 Lưu dữ liệu dự đoán đêm nay (CSV)",
         "info": "Thời tiết: **{ws}** · Nhãn seeing: **{ls}** · CV MAE {mae:.2f}″, R² {r2:.2f}. "
         "Mô hình seeing học từ nhãn giả lập cho tới khi được thay bằng nhật ký quan sát thật.",
     },
@@ -336,6 +338,19 @@ with tab_plan:
         st.dataframe(pareto_front(df).round(2))
     with st.expander(T["raw"]):
         st.dataframe(df.round(2))
+
+    # Full hourly table plus the settings that produced it, so a saved night can be reproduced.
+    export = df.assign(
+        local_time=labels, lat=lat, lon=lon, target=target, utc_offset=tz,
+        w_altitude=w_alt, w_moon=w_moon, w_cloud=w_cloud, w_seeing=w_see,
+        weather_source=meta["weather_source"], seeing_label_source=meta["seeing_label_source"],
+    )
+    st.download_button(
+        T["save"],
+        export.to_csv(index_label="time_utc").encode("utf-8"),
+        file_name=f"skyscore_{date:%Y-%m-%d}_{target.replace(' ', '_')}.csv",
+        mime="text/csv",
+    )
 
     st.info(
         T["info"].format(
