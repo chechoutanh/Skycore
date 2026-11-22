@@ -22,6 +22,8 @@ st.set_page_config(page_title="SkyScore", page_icon="🔭", layout="wide")
 
 DATA = Path(__file__).parent / "data"
 EVENTS, OBS = DATA / "events.csv", DATA / "observations.csv"
+PHOTOS = Path(__file__).parent / "photos"  # photos/<event_id>/*.jpg, made with `python -m skyscore.photos`
+IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 @st.cache_resource
@@ -260,7 +262,14 @@ TEXT = {
         "w_cloud": "Clear sky",
         "w_see": "Steady air (seeing)",
         "window": "Window length (h)",
-        "tabs": ["🔭 Planner", "📝 Observing log", "ℹ️ About", "📖 Guide"],
+        "tabs": ["🔭 Planner", "🌟 Our stargazing nights", "📝 Observing log", "ℹ️ About", "📖 Guide"],
+        "nights_intro": "Public stargazing sessions run by our club: who came, where, and what we looked at.",
+        "nights_events": "Sessions", "nights_people": "People reached (approx.)", "nights_places": "Places",
+        "nights_used": "🔭 SkyScore was used to pick the time for this session (suggested window: {w}).",
+        "nights_people_one": "{n} participants",
+        "nights_empty": "No photos yet. Put photos for a session in `photos/<event_id>/` "
+        "(for example `photos/E01/`) with `python -m skyscore.photos <photo folder> E01`: "
+        "it shrinks them and removes GPS location.",
         "log_intro": "After each session, note how the sky **really** was. With 20–30 sessions we can measure how accurate SkyScore is. "
         "Log bad hours too (clouds, blurry stars): they matter just as much.",
         "log_pw": "🔒 Owner password", "log_pw_bad": "Wrong password.",
@@ -345,7 +354,14 @@ TEXT = {
         "w_cloud": "Trời quang",
         "w_see": "Khí quyển ổn định (seeing)",
         "window": "Độ dài cửa sổ (giờ)",
-        "tabs": ["🔭 Lập lịch", "📝 Nhật ký quan sát", "ℹ️ Giới thiệu", "📖 Hướng dẫn"],
+        "tabs": ["🔭 Lập lịch", "🌟 Những buổi ngắm sao", "📝 Nhật ký quan sát", "ℹ️ Giới thiệu", "📖 Hướng dẫn"],
+        "nights_intro": "Các buổi ngắm sao cộng đồng do CLB tổ chức: ai đã tham gia, ở đâu, và đã quan sát gì.",
+        "nights_events": "Số buổi", "nights_people": "Số người tham gia (ước tính)", "nights_places": "Số địa điểm",
+        "nights_used": "🔭 Buổi này đã dùng SkyScore để chọn giờ (khung giờ gợi ý: {w}).",
+        "nights_people_one": "{n} người tham gia",
+        "nights_empty": "Chưa có ảnh. Đặt ảnh của mỗi buổi vào `photos/<mã buổi>/` "
+        "(ví dụ `photos/E01/`) bằng lệnh `python -m skyscore.photos <thư mục ảnh> E01`: "
+        "lệnh này giảm dung lượng và xoá vị trí GPS trong ảnh.",
         "log_intro": "Sau mỗi buổi, ghi lại bầu trời **thực tế** ra sao. Có khoảng 20–30 buổi là đo được SkyScore chuẩn đến đâu. "
         "Hãy ghi cả những giờ xấu (mây, sao nhoè): chúng quan trọng không kém.",
         "log_pw": "🔒 Mật khẩu chủ sở hữu", "log_pw_bad": "Sai mật khẩu.",
@@ -481,9 +497,36 @@ with st.sidebar:
 st.title("🔭 SkyScore")
 st.caption(T["caption"])
 
-tab_plan, tab_log, tab_intro, tab_guide = st.tabs(T["tabs"])
+tab_plan, tab_nights, tab_log, tab_intro, tab_guide = st.tabs(T["tabs"])
 
 # Other tabs are filled first so they still render if the planner calls st.stop().
+with tab_nights:
+    st.markdown(T["nights_intro"])
+    ev = pd.read_csv(EVENTS).sort_values("date", ascending=False)
+    people = pd.to_numeric(ev["participants"].astype(str).str.extract(r"(\d+)")[0], errors="coerce")  # "~40" -> 40
+    a, b, c = st.columns(3)
+    a.metric(T["nights_events"], len(ev))
+    b.metric(T["nights_people"], f"{int(people.sum())}+")
+    c.metric(T["nights_places"], ev["site"].nunique())
+    shown = 0
+    for (_, e), n in zip(ev.iterrows(), people):
+        pics = sorted(p for p in (PHOTOS / str(e["event_id"])).glob("*") if p.suffix.lower() in IMG_EXTS)
+        if not pics:
+            continue
+        shown += 1
+        st.divider()
+        st.subheader(e["site"])
+        looked_at = ", ".join(x for x in (e["target"], e["other_targets"]) if isinstance(x, str) and x.strip())
+        facts = [e["date"], e["club"], T["nights_people_one"].format(n=e["participants"]) if pd.notna(n) else None, f"🔭 {looked_at}" if looked_at else None]
+        st.caption(" · ".join(str(x) for x in facts if isinstance(x, str) and x))
+        if str(e["prediction_saved"]).strip().lower() == "yes":
+            st.success(T["nights_used"].format(w=e["recommended_window"]))
+        cols = st.columns(3)
+        for i, p in enumerate(pics):
+            cols[i % 3].image(str(p), use_container_width=True)
+    if not shown:
+        st.info(T["nights_empty"])
+
 with tab_log:
     st.markdown(T["log_intro"])
     st.caption(T["log_from_sidebar"].format(target=target, date=date, lat=lat, lon=lon, tz=tz))
