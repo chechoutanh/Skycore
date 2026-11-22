@@ -258,7 +258,7 @@ TEXT = {
         "log_intro": "After each session, note how the sky **really** was. With 20–30 sessions we can measure how accurate SkyScore is. "
         "Log bad hours too (clouds, blurry stars): they matter just as much.",
         "log_pw": "🔒 Owner password", "log_pw_bad": "Wrong password.",
-        "log_no_pw": "🔒 The observing log is private. To use it, the owner sets `log_password` in `.streamlit/secrets.toml` "
+        "log_no_pw": "🔒 Saved entries are private. To view them, the owner sets `log_password` in `.streamlit/secrets.toml` "
         "(or in the app's Secrets on Streamlit Cloud).",
         "log_from_sidebar": "Site, target and date come from the sidebar: **{target}**, {date}, ({lat:.2f}, {lon:.2f}), UTC{tz:+g}.",
         "log_site": "Place name", "log_club": "Club / observer",
@@ -270,7 +270,7 @@ TEXT = {
         "log_notes": "Notes (optional)", "log_submit": "💾 Save this entry",
         "log_saved": "Saved to session {eid}. Logging another hour of the same night? Change the time and save again.",
         "log_cloud_warn": "Note: on a hosted app (e.g. Streamlit Cloud) saved entries can disappear on restart. Download the CSV files below to keep them.",
-        "log_table": "Logged sessions ({n} entries)",
+        "log_table": "🔒 Saved entries ({n}), owner only",
         "log_dl_events": "⬇️ events.csv", "log_dl_obs": "⬇️ observations.csv",
         "log_eval": "📊 How accurate is SkyScore so far?",
         "log_eval_err": "Could not evaluate: {e}",
@@ -338,7 +338,7 @@ TEXT = {
         "log_intro": "Sau mỗi buổi, ghi lại bầu trời **thực tế** ra sao. Có khoảng 20–30 buổi là đo được SkyScore chuẩn đến đâu. "
         "Hãy ghi cả những giờ xấu (mây, sao nhoè): chúng quan trọng không kém.",
         "log_pw": "🔒 Mật khẩu chủ sở hữu", "log_pw_bad": "Sai mật khẩu.",
-        "log_no_pw": "🔒 Nhật ký quan sát là riêng tư. Để dùng, chủ sở hữu đặt `log_password` trong `.streamlit/secrets.toml` "
+        "log_no_pw": "🔒 Dữ liệu đã lưu là riêng tư. Để xem, chủ sở hữu đặt `log_password` trong `.streamlit/secrets.toml` "
         "(hoặc mục Secrets của app trên Streamlit Cloud).",
         "log_from_sidebar": "Địa điểm, mục tiêu và ngày lấy từ thanh bên: **{target}**, {date}, ({lat:.2f}, {lon:.2f}), UTC{tz:+g}.",
         "log_site": "Tên địa điểm", "log_club": "CLB / người quan sát",
@@ -350,7 +350,7 @@ TEXT = {
         "log_notes": "Ghi chú (không bắt buộc)", "log_submit": "💾 Lưu mục này",
         "log_saved": "Đã lưu vào buổi {eid}. Muốn ghi thêm giờ khác của cùng đêm? Đổi giờ rồi lưu tiếp.",
         "log_cloud_warn": "Lưu ý: nếu app chạy trên máy chủ (ví dụ Streamlit Cloud), dữ liệu đã lưu có thể mất khi khởi động lại. Hãy tải các file CSV bên dưới để giữ lại.",
-        "log_table": "Các buổi đã ghi ({n} mục)",
+        "log_table": "🔒 Dữ liệu đã lưu ({n} mục), chỉ chủ sở hữu",
         "log_dl_events": "⬇️ events.csv", "log_dl_obs": "⬇️ observations.csv",
         "log_eval": "📊 SkyScore chuẩn đến đâu?",
         "log_eval_err": "Không đánh giá được: {e}",
@@ -469,53 +469,54 @@ tab_plan, tab_log, tab_intro, tab_guide = st.tabs(T["tabs"])
 
 # Other tabs are filled first so they still render if the planner calls st.stop().
 with tab_log:
-    if log_unlocked(T):
-        st.markdown(T["log_intro"])
-        st.caption(T["log_from_sidebar"].format(target=target, date=date, lat=lat, lon=lon, tz=tz))
-        with st.form("log", clear_on_submit=True):
-            a, b = st.columns(2)
-            site = a.text_input(T["log_site"])
-            club = b.text_input(T["log_club"])
-            obs_time = a.time_input(T["log_time"], dtime(21, 0), step=1800)
-            duration = b.number_input(T["log_duration"], 0.5, 12.0, 1.0, 0.5)
-            seeing = a.select_slider(T["log_seeing"], [1, 2, 3, 4, 5], 3, help=T["log_seeing_help"])
-            quality = b.select_slider(T["log_quality"], [1, 2, 3, 4, 5], 3, help=T["log_quality_help"])
-            cloud = a.slider(T["log_cloud"], 0, 100, 0, 10)
-            wind = b.radio(T["log_wind"], list(T["wind"]), format_func=T["wind"].get, horizontal=True)
-            notes = st.text_input(T["log_notes"])
-            if st.form_submit_button(T["log_submit"], type="primary"):
-                eid = save_log(
-                    {"date": f"{date:%Y-%m-%d}", "club": club, "site": site, "lat": lat, "lon": lon, "utc_offset": tz, "target": target},
-                    {"time": f"{obs_time:%H:%M}", "duration_h": duration, "seeing_value": seeing, "seeing_method": "scale_1_5",
-                     "cloud_observed": cloud, "quality_rating": quality, "wind_feel": wind, "notes": notes},
-                )
-                st.success(T["log_saved"].format(eid=eid))
-        st.caption(T["log_cloud_warn"])
-
-        logs = load_logs(EVENTS, OBS)
-        with st.expander(T["log_table"].format(n=len(logs))):
-            st.dataframe(logs[["event_id", "date", "time", "site", "target", "seeing_value", "cloud_observed", "quality_rating", "notes"]], hide_index=True)
+    st.markdown(T["log_intro"])
+    st.caption(T["log_from_sidebar"].format(target=target, date=date, lat=lat, lon=lon, tz=tz))
+    with st.form("log", clear_on_submit=True):
         a, b = st.columns(2)
-        a.download_button(T["log_dl_events"], EVENTS.read_bytes(), "events.csv", "text/csv")
-        b.download_button(T["log_dl_obs"], OBS.read_bytes(), "observations.csv", "text/csv")
+        site = a.text_input(T["log_site"])
+        club = b.text_input(T["log_club"])
+        obs_time = a.time_input(T["log_time"], dtime(21, 0), step=1800)
+        duration = b.number_input(T["log_duration"], 0.5, 12.0, 1.0, 0.5)
+        seeing = a.select_slider(T["log_seeing"], [1, 2, 3, 4, 5], 3, help=T["log_seeing_help"])
+        quality = b.select_slider(T["log_quality"], [1, 2, 3, 4, 5], 3, help=T["log_quality_help"])
+        cloud = a.slider(T["log_cloud"], 0, 100, 0, 10)
+        wind = b.radio(T["log_wind"], list(T["wind"]), format_func=T["wind"].get, horizontal=True)
+        notes = st.text_input(T["log_notes"])
+        if st.form_submit_button(T["log_submit"], type="primary"):
+            eid = save_log(
+                {"date": f"{date:%Y-%m-%d}", "club": club, "site": site, "lat": lat, "lon": lon, "utc_offset": tz, "target": target},
+                {"time": f"{obs_time:%H:%M}", "duration_h": duration, "seeing_value": seeing, "seeing_method": "scale_1_5",
+                 "cloud_observed": cloud, "quality_rating": quality, "wind_feel": wind, "notes": notes},
+            )
+            st.success(T["log_saved"].format(eid=eid))
 
-        if st.button(T["log_eval"]):
-            try:
-                with st.spinner(T["computing"]):
-                    m = evaluate(add_predictions(logs, get_model(), offline=offline))
-            except Exception as e:  # network or bad rows: show it, keep the rest of the app usable
-                st.error(T["log_eval_err"].format(e=e))
-            else:
-                a, b, c = st.columns(3)
-                if "rating_at_skyscore_hour" in m:
-                    a.metric(T["ev_rating"], f"{m['rating_at_skyscore_hour']:.2f} / 5",
-                             T["ev_rating_delta"].format(d=m["rating_at_skyscore_hour"] - m["rating_at_random_hour"]))
-                if "cloud_mae_forecast" in m:
-                    b.metric(T["ev_cloud"], f"{m['cloud_mae_forecast']:.0f}%",
-                             T["ev_cloud_delta"].format(d=m["cloud_mae_forecast"] - m["cloud_mae_climatology"]), delta_color="inverse")
-                rho = m.get("seeing_scale_1_5_spearman")
-                c.metric(T["ev_seeing"], T["ev_missing"] if rho is None or pd.isna(rho) else f"{rho:.2f}", help=T["ev_seeing_help"])
-                st.info(T["ev_note"].format(events=m["events"], hours=m["hours"]))
+    logs = load_logs(EVENTS, OBS)
+    if st.button(T["log_eval"]):
+        try:
+            with st.spinner(T["computing"]):
+                m = evaluate(add_predictions(logs, get_model(), offline=offline))
+        except Exception as e:  # network or bad rows: show it, keep the rest of the app usable
+            st.error(T["log_eval_err"].format(e=e))
+        else:
+            a, b, c = st.columns(3)
+            if "rating_at_skyscore_hour" in m:
+                a.metric(T["ev_rating"], f"{m['rating_at_skyscore_hour']:.2f} / 5",
+                         T["ev_rating_delta"].format(d=m["rating_at_skyscore_hour"] - m["rating_at_random_hour"]))
+            if "cloud_mae_forecast" in m:
+                b.metric(T["ev_cloud"], f"{m['cloud_mae_forecast']:.0f}%",
+                         T["ev_cloud_delta"].format(d=m["cloud_mae_forecast"] - m["cloud_mae_climatology"]), delta_color="inverse")
+            rho = m.get("seeing_scale_1_5_spearman")
+            c.metric(T["ev_seeing"], T["ev_missing"] if rho is None or pd.isna(rho) else f"{rho:.2f}", help=T["ev_seeing_help"])
+            st.info(T["ev_note"].format(events=m["events"], hours=m["hours"]))
+
+    # Everyone can add entries and see the aggregate check; the raw entries are owner-only.
+    with st.expander(T["log_table"].format(n=len(logs))):
+        if log_unlocked(T):
+            st.dataframe(logs[["event_id", "date", "time", "site", "target", "seeing_value", "cloud_observed", "quality_rating", "notes"]], hide_index=True)
+            a, b = st.columns(2)
+            a.download_button(T["log_dl_events"], EVENTS.read_bytes(), "events.csv", "text/csv")
+            b.download_button(T["log_dl_obs"], OBS.read_bytes(), "observations.csv", "text/csv")
+            st.caption(T["log_cloud_warn"])
 
 with tab_intro:
     st.markdown(T["intro"])
