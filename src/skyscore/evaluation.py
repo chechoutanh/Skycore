@@ -46,8 +46,8 @@ def load_logs(events_path: str, observations_path: str) -> pd.DataFrame:
         raise ValueError(f"observations.csv has event_id not in events.csv: {missing}")
 
     local = pd.to_datetime(df["date"]) + pd.to_timedelta(df["time"].astype(str) + ":00")
-    # Hours after midnight belong to the night that started on `date`.
-    local += pd.to_timedelta((local.dt.hour < 12).astype(int), unit="D")
+    # Hours after midnight belong to the night that started on `date`; Sun sessions are daytime, same day.
+    local += pd.to_timedelta(((local.dt.hour < 12) & (df["target"] != "Sun")).astype(int), unit="D")
     df["hour_utc"] = (local - pd.to_timedelta(df["utc_offset"], unit="h")).dt.round("h")
     return df
 

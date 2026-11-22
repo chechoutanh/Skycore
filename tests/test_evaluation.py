@@ -15,6 +15,7 @@ def logs(tmp_path):
         "event_id,date,club,site,lat,lon,utc_offset,target\n"
         "E01,2026-01-15,A,HCM,10.78,106.70,7,M42 (Orion Nebula)\n"
         "E02,2026-01-20,B,HCM,10.78,106.70,7,M42 (Orion Nebula)\n"
+        "E03,2026-01-22,C,HCM,10.78,106.70,7,Sun\n"
     )
     ob.write_text(
         "event_id,time,seeing_value,seeing_method,cloud_observed,quality_rating\n"
@@ -23,6 +24,7 @@ def logs(tmp_path):
         "E01,01:00,1.9,fwhm_arcsec,5,5\n"
         "E02,21:00,3,scale_1_5,20,3\n"
         "E02,23:00,4,scale_1_5,0,4\n"
+        "E03,11:00,3,scale_1_5,20,3\n"
     )
     return str(ev), str(ob)
 
@@ -32,6 +34,8 @@ def test_local_time_to_utc_crosses_midnight(logs):
     # 01:00 local (UTC+7) on the night of Jan 15 is Jan 15 18:00 UTC.
     assert df["hour_utc"].iloc[2] == pd.Timestamp("2026-01-15 18:00")
     assert df["hour_utc"].iloc[0] == pd.Timestamp("2026-01-15 13:00")
+    # Sun sessions are daytime: 11:00 local stays on the same date.
+    assert df["hour_utc"].iloc[5] == pd.Timestamp("2026-01-22 04:00")
 
 
 def test_evaluate_offline(logs):
@@ -39,7 +43,7 @@ def test_evaluate_offline(logs):
     model = SeeingModel(n_estimators=20).fit(X, y)
     df = add_predictions(load_logs(*logs), model, offline=True)
     m = evaluate(df)
-    assert m["events"] == 2 and m["hours"] == 5
+    assert m["events"] == 3 and m["hours"] == 6
     assert df["seeing_pred"].notna().all() and df["score"].notna().all()
     assert {"seeing_mae_model", "cloud_mae_forecast", "rating_at_skyscore_hour"} <= m.keys()
     assert m["rating_at_random_hour"] <= m["rating_at_best_hour"]

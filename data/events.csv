@@ -1,1 +1,9 @@
 event_id,date,club,site,lat,lon,utc_offset,target,other_targets,equipment,participants,recommended_window,prediction_saved
+E01,2026-07-25,CLB Thiên văn USAC,Trung tâm Khám phá Khoa học & Đổi mới Sáng tạo Quy Nhơn,13.76,109.22,7,Moon,các chòm sao,"Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm) + kính lọc Mặt Trời; bản đồ sao LED",~40,10:00-13:00,
+E02,2025-03-14,CLB Thiên văn USAC,"Công viên Tao Đàn, TP.HCM",10.7875,106.6925,7,Moon,"các hành tinh khác trong hệ mặt trời, chòm sao gáu lớn","Mak SV105 (102 mm, f=1200 mm); Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm)",20,00:00-03:00,
+E03,2025-05-18,CLB Thiên văn USAC,"Ngày hội Khoa học Vũ trụ (Liên hoan Tuổi trẻ Sáng tạo TP.HCM 2025), TP.HCM",10.78,106.7,7,Sun,,"Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm) + kính lọc Mặt Trời",30,11:00-14:00,
+E04,2025-05-25,CLB Thiên văn USAC,"ĐH Khoa học Tự nhiên ĐHQG-HCM (Ngày hội Sinh viên & Doanh nghiệp), TP.HCM",10.7629,106.6821,7,Sun,,Kính thiên văn; thiết bị đo độ sáng bầu trời SQM,~50+,,
+E05,2025-07-11,CLB Thiên văn USAC,ExploraScience Gia Lai (Quy Nhơn),13.76,109.22,7,Sun,,"Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm) + kính lọc Mặt Trời",~30+,13:00-16:00,
+E06,2025-07-25,CLB Thiên văn USAC + KOCUN Cần Thơ,"Trung tâm KOCUN, Cần Thơ",10.03,105.77,7,Mars,other solar planets other constellations,"Mak SV105 (102 mm, f=1200 mm); Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm); phần mềm mô phỏng bầu trời",45,,
+E07,2025-10-04,CLB Thiên văn USAC + SEAC (ĐH Quốc tế),"Công viên Tao Đàn, TP.HCM",10.7875,106.6925,7,Moon,other solar planets other constellations,"Mak SV105 (102 mm, f=1200 mm); Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm)",~15,20:00-23:00,
+E08,2026-02-28,CLB Thiên văn USAC,"THPT Chuyên Thoại Ngọc Hầu, Long Xuyên, An Giang",10.37,105.43,7,Moon,,"Celestron StarSense Explorer LT 80AZ (80 mm, f=900 mm) + kính lọc Mặt Trời",30,,
