@@ -60,7 +60,14 @@ Mỗi thanh trượt cho biết tiêu chí đó quan trọng thế nào với b�
 
 Dòng thông tin cuối trang cho biết nguồn thời tiết (thật hay giả lập) và nguồn nhãn của mô hình seeing.
 
-## 3. Câu hỏi thường gặp
+## 3. Lưu dự đoán và ghi nhật ký quan sát
+
+- Nút **💾 Lưu dữ liệu dự đoán đêm nay (CSV)** tải về bảng 24 giờ kèm toạ độ, mục tiêu, múi giờ, trọng số và nguồn thời tiết. Hãy lưu **trước** buổi quan sát để đối chiếu công bằng sau đó.
+- Sau buổi quan sát, ghi một dòng vào `data/observations.csv`: `event_id`, `time` (giờ giữa phiên, ví dụ 20:00), `duration_h` (độ dài phiên, giờ), `seeing_value`, `seeing_method`, `cloud_observed` (%), `quality_rating`, `wind_feel`. Để trống `transparency` nếu không đo.
+- Thông tin buổi quan sát (địa điểm, ngày, mục tiêu, múi giờ) ghi trong `data/events.csv`. Chạy đánh giá bằng `PYTHONPATH=src python -m skyscore.evaluation data/events.csv data/observations.csv`.
+- Khi lưu CSV từ Excel, nhớ xoá các dòng trống ở cuối file.
+
+## 4. Câu hỏi thường gặp
 
 **"Target never observable tonight"?**
 Mục tiêu không lên cao quá 15° trong lúc trời đủ tối cho nó (Mặt Trời dưới −18° với thiên thể sâu, −12° với chòm sao, −6° với hành tinh sáng). Hãy thử ngày khác hoặc mục tiêu khác. Ví dụ M42 dễ quan sát vào các tháng 11 đến 3.

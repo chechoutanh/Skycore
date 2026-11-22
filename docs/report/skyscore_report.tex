@@ -260,6 +260,34 @@ Các con số trên chỉ cho thấy pipeline \emph{khôi phục được công 
 \textbf{không} phải bằng chứng về khả năng dự báo seeing thực tế. Độ quan trọng của gió
 250\,hPa ($\approx 0{,}88$) phản ánh cách xây dựng nhãn giả lập.
 
+\subsection{Đánh giá trên nhật ký quan sát thực tế}
+Với 12 buổi quan sát thực tế của hai CLB (dữ liệu trong \texttt{data/}), mô-đun
+\texttt{skyscore.evaluation} dựng lại dự báo mà SkyScore sẽ đưa ra \emph{trước} buổi quan sát
+(dự báo lưu trữ của Open-Meteo, không dùng dữ liệu hậu kiểm) rồi so với số đo. Mỗi buổi chỉ được
+ghi một dòng tóm tắt cả phiên (1--3 giờ), nên có tất cả 12 dòng; dự báo được lấy trung bình
+trên đúng khoảng thời gian đó. Mốc so sánh là \emph{climatology} (luôn đoán giá trị trung bình).
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Chỉ số} & \textbf{SkyScore} & \textbf{Mốc so sánh} \
+\midrule
+Tương quan hạng seeing (Spearman, thang 1--5) & $0{,}15$ & $0$ \
+Sai số tuyệt đối trung bình của mây (\%) & $9{,}4$ & $24{,}4$ \
+Điểm chất lượng tại giờ được đề xuất (1--5) & $3{,}23$ & $3{,}23$ \
+\bottomrule
+\end{tabular}
+\caption{Đánh giá trên 12 buổi quan sát thực tế.}
+\end{table}
+
+\paragraph{Diễn giải trung thực.}
+Mây là tín hiệu khả quan: dự báo trung bình theo phiên lệch khoảng 9 điểm phần trăm so với mắt
+quan sát, tốt hơn rõ rệt so với đoán trung bình (24 điểm). Với seeing, tương quan hạng chỉ
+$0{,}15$ trên 12 điểm, không có ý nghĩa thống kê, nên \textbf{chưa có bằng chứng} mô hình dự báo
+được seeing (mô hình vẫn học từ nhãn giả lập). Vì mỗi buổi chỉ có một dòng nên giờ được đề xuất
+và giờ ngẫu nhiên trùng nhau, do đó hàng điểm chất lượng không thể hiện kỹ năng. Số mẫu quá nhỏ
+để kết luận chắc chắn; các lần ghi sau cần ghi từng giờ, kể cả giờ xấu, và đo seeing bằng FWHM.
+
 %=====================================================================
 \section{Kết quả minh hoạ}
 
@@ -303,6 +331,8 @@ một giờ duy nhất.
   \item \textbf{Giới thiệu}: mô tả phương pháp và lưu ý về dữ liệu.
   \item \textbf{Hướng dẫn}: cách dùng, cách đọc kết quả, câu hỏi thường gặp.
 \end{itemize}
+Nút \textbf{Lưu dữ liệu dự đoán đêm nay (CSV)} trong tab Planner tải về bảng 24 giờ kèm toạ độ,
+mục tiêu, múi giờ, trọng số và nguồn thời tiết, để đối chiếu với số đo sau buổi quan sát.
 
 Chạy cục bộ:
 \begin{lstlisting}[language=bash]
@@ -315,7 +345,7 @@ streamlit run app.py    # mo giao dien web
 \section{Kiểm thử}
 Bộ kiểm thử \texttt{pytest} bao gồm: tính đúng của chuẩn hoá min--max, ràng buộc quan sát
 được, điểm nằm trong $[0,1]$, cửa sổ tốt nhất, tập Pareto, độ nhạy trọng số, và chạy toàn bộ
-pipeline ở chế độ offline.
+pipeline ở chế độ offline. Hiện có 24 bài kiểm thử, tất cả đều đạt.
 
 %=====================================================================
 \section{Hạn chế và hướng phát triển}

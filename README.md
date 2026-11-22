@@ -66,14 +66,14 @@ PYTHONPATH=src python -m skyscore.evaluation data/events.csv data/observations.c
 
 | Metric | SkyScore | Baseline |
 |---|---|---|
-| Seeing rank correlation (Spearman, 1–5 scale) | −0.28 | 0 (no skill) |
+| Seeing rank correlation (Spearman, 1–5 scale) | 0.15 | 0 (no skill) |
 | Seeing MAE, FWHM hours (″) | n/a (no FWHM measurements yet) | n/a |
 | Cloud MAE (%) | 9.4 | 24.4 (climatology) |
-| Observing rating at the recommended hour (1–5) | 3.47 | 3.47 (random logged hour) |
+| Observing rating at the recommended hour (1–5) | 3.23 | 3.23 (random logged hour) |
 
 The baseline is climatology (always predict the average) because measurements of the same night are not available when the plan is made.
 
-Results above: 12 events, archived Open-Meteo forecasts. Conditions were logged once per event as a summary of the whole session (1–3 h), timed at its midpoint (e.g. 20:00 for 19:00–21:00; cloud estimated by eye), and compared with the forecast averaged over the same session (`duration_h`). So there are only 12 logged rows. **This is too little data for firm conclusions.** Cloud is the encouraging signal: the session-averaged forecast was within about 9 percentage points of what observers saw, clearly better than guessing the average. Seeing shows no skill yet (the model is still trained on proxy labels). With one logged hour per event the recommended hour and a random hour are the same hour, so the rating row cannot show skill. Future logs should record every hour of an event, including bad ones.
+Results above: 12 events, archived Open-Meteo forecasts. Conditions were logged once per event as a summary of the whole session (1–3 h), timed at its midpoint (e.g. 20:00 for 19:00–21:00; cloud estimated by eye), and compared with the forecast averaged over the same session (`duration_h`). So there are only 12 logged rows. **This is too little data for firm conclusions.** Cloud is the encouraging signal: the session-averaged forecast was within about 9 percentage points of what observers saw, clearly better than guessing the average. Seeing shows only a weak positive rank correlation (Spearman 0.15 on 12 points, not statistically meaningful), so there is no demonstrated seeing skill yet (the model is still trained on proxy labels). With one logged hour per event the recommended hour and a random hour are the same hour, so the rating row cannot show skill. Future logs should record every hour of an event, including bad ones.
 
 **To make the model scientifically meaningful**, replace the labels with real measurements, for example the club's own observing logs (estimated seeing from double-star splitting or star FWHM in images), merged with archived weather for the same hours, and call `SeeingModel.fit(X, y, label_source="club logs")`. With real labels, report the CV error against a persistence/climatology baseline.
 
