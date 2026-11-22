@@ -312,7 +312,8 @@ for k, v in zip(W_KEYS, PRESETS["balanced"]):
     st.session_state.setdefault(k, v)
 
 
-def apply_preset():
+def apply_preset(widget_key):
+    st.session_state.preset = st.session_state[widget_key]
     st.session_state.update(zip(W_KEYS, PRESETS[st.session_state.preset]))
 
 
@@ -334,7 +335,11 @@ with st.sidebar:
     offline = st.checkbox(T["offline"], value=False, key="offline")
 
     st.header(T["weights"])
-    st.selectbox(T["goal"], list(PRESETS), format_func=T["presets"].get, key="preset", on_change=apply_preset, help=T["goal_help"])
+    # One widget per language: Streamlit keeps the old label on screen when format_func changes.
+    st.selectbox(
+        T["goal"], list(PRESETS), index=list(PRESETS).index(st.session_state.get("preset", "balanced")),
+        format_func=T["presets"].get, key=f"preset_{lang}", on_change=apply_preset, args=(f"preset_{lang}",), help=T["goal_help"],
+    )
     window = st.slider(T["window"], 1, 6, 3, key="window", help=T["window_help"])
     with st.expander(T["fine_tune"]):
         w_alt = st.slider(T["w_alt"], 0.0, 1.0, step=0.05, key="w_alt")
@@ -380,7 +385,7 @@ with tab_plan:
         c1.error(T["never"])
 
     st.subheader(T["score_time"])
-    st.altair_chart(night_chart(df, ["score"], labels), use_container_width=True)
+    st.altair_chart(night_chart(df.rename(columns={"score": T["col_score"]}), [T["col_score"]], labels), use_container_width=True)
 
     left, right = st.columns(2)
     with left:
