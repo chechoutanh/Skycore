@@ -96,85 +96,237 @@ def night_chart(df: pd.DataFrame, cols: list[str], labels: list[str]):
 INTRO_EN = r"""
 ### What is SkyScore?
 
-SkyScore answers a practical question every astronomy club asks:
-**"When tonight should we point the telescope at this target?"**
+SkyScore answers one question: **"Tonight, at what time should we point the telescope at this target?"**
 
-For every hour of the day it combines four sources of information:
+Think of it as a judge who gives **every hour of the night a mark from 0 to 1**, then tells you the best few hours in a row.
+You don't need to know any astronomy to use it: pick a place, a date and a target, and read the green verdict in the Planner tab.
 
-| Criterion | Source | Meaning |
-|---|---|---|
-| 🌌 Target altitude | Astropy (offline celestial mechanics) | Higher means less atmosphere in the way (lower airmass) |
-| 🌙 Moon | Astropy | A bright Moon that is up and close to the target brightens the sky |
-| ☁️ Clouds | Open-Meteo (free forecast) | Clouds block the view |
-| ✨ Seeing | Random Forest model | Star "twinkle" caused by atmospheric turbulence (arcsec) |
+#### How it works, in 5 steps
 
-Each criterion is normalized to a **0 (bad) – 1 (good)** scale and combined into a score
+**1. Lay out the night.** SkyScore looks at 24 hours, from local noon on your date to noon the next day,
+so the whole evening and night are covered. (For the Sun it looks at the day instead: midnight to midnight.)
 
-$$S(t) = \mathbb{1}[\text{observable}(t)]\sum_i w_i\,g_i(t), \qquad \sum_i w_i = 1.$$
+**2. Work out where everything is in the sky.** For each hour it calculates how high your target is,
+where the Sun is and where the Moon is and how full it is. This is pure geometry, like a clock: it needs no internet
+and is accurate to a fraction of a degree.
 
-An hour counts as *observable* only when the target is above 15° and the sky is dark enough for it:
-Sun below −18° for galaxies, nebulae and clusters, −12° for naked-eye constellations, −6° for bright planets.
-The Sun itself is a daytime target. Moonlight does not count against the Sun or the Moon.
+**3. Throw out hours that are impossible.** An hour gets **0 points** if:
 
-#### How the numbers are calculated
+* the target is **lower than 15°** above the horizon (it is hidden behind trees and buildings, and you look through too much air), or
+* the sky is **not dark enough** for that kind of target. Faint galaxies and nebulae need full darkness;
+  constellations need the sky "mostly dark"; bright planets and the Moon can be seen soon after sunset.
 
-* **Position of the target.** Planets, the Moon, the Sun and planetary moons: Astropy computes their sky position for each hour from an ephemeris (`get_body`), as seen from your latitude/longitude. Deep-sky objects and constellations are fixed points (RA/Dec). Each position is converted to the local sky: **altitude** $h$ above the horizon.
-* **Visibility (is it blocked?).** A target is hidden by the horizon when $h<0°$, and too low to be useful below 15° (thick air, buildings, trees). The Sun must also be low enough: below −18°, −12° or −6° depending on the target (see above). Outside these limits the hour scores 0.
-* **Altitude score.** $g_{\text{alt}}=\max(0,\sin h)$, a proxy for $1/\text{airmass}$: the target at the zenith scores 1, at 30° it scores 0.5.
-* **Moon.** The illuminated fraction is $k=(1+\cos i)/2$, where $i$ is the Sun–Moon phase angle. The penalty grows with $k$ and shrinks with the Moon–target angular separation $\theta$ (as $e^{-\theta/40°}$); it applies only while the Moon is above the horizon.
-* **Clouds and seeing.** Cloud cover comes from the Open-Meteo forecast ($g=1-c/100$). Seeing (arcsec) comes from the Random Forest model, then $g_{\text{see}}$ maps 0.8″ (best) to 3.5″ (worst) onto 1 to 0.
+**4. Mark each remaining hour on four things**, each from 0 (bad) to 1 (good):
 
-Besides the total score, the app also reports:
+| | Criterion | What it means in plain words | Where the data comes from |
+|---|---|---|---|
+| 🌌 | **Height in sky** | The higher the target, the less air you look through, so it looks sharper and brighter. Overhead = 1, halfway up (30°) = 0.5. | Calculated (Astropy) |
+| 🌙 | **Moon darkness** | A bright Moon lights up the sky like a street lamp and washes out faint objects. It hurts most when it is full, up, and close to your target. A new Moon or a Moon below the horizon = 1. | Calculated (Astropy) |
+| ☁️ | **Clear sky** | Clouds block everything. No cloud = 1, fully overcast = 0. | Weather forecast (Open-Meteo, free) |
+| ✨ | **Steady air (seeing)** | Even on a clear night, moving air makes stars "boil" and twinkle, so details blur. Steady air matters most for planets and the Moon. | Predicted by a machine-learning model from the forecast |
 
-* **Best window**: the *L* consecutive hours with the highest mean score.
-* **Pareto set**: hours not beaten by any other hour in *all four* criteria, showing trade-offs without choosing weights.
-* **Robustness**: 500 random weight sets are tried; if most pick the same hour, the recommendation is reliable.
+**5. Add the marks up, with your priorities.** Not every goal cares about the same things, so each criterion has a weight
+(how much it counts). Picking **What do you want to observe?** sets the weights for you:
 
-> ⚠️ **Data honesty:** the seeing model is currently trained on *proxy labels*
-> (an approximate physical formula), not real measurements. The MAE/R² shown in the Planner tab
-> only prove the pipeline works; they are **not** evidence of real-world forecasting skill.
+| Goal | Height | Moon | Clouds | Seeing |
+|---|---|---|---|---|
+| Balanced (default) | 35% | 20% | 30% | 15% |
+| Faint galaxies & nebulae | 25% | **35%** | 30% | 10% |
+| Planets & the Moon | 35% | 5% | 25% | **35%** |
+| Public / casual night | 25% | 10% | **55%** | 10% |
+
+The total mark of an hour is the weighted average of its four marks, so it is also between 0 and 1.
+As a rule of thumb: **above 0.7 is good, 0.5–0.7 is fair, below 0.5 is poor.**
+
+#### What you get back
+
+* **Best window**: the block of consecutive hours (you choose how long) with the highest average mark. This is the "go out at…" answer.
+* **Confidence**: SkyScore re-does the choice 500 times with random priorities. If the same hour wins most of the time,
+  the answer does not depend on how you set the sliders, so you can trust it. A low value means "it depends on what you care about".
+* **Other good hours (trade-offs)**: hours that are unbeatable in at least one way, e.g. the clearest hour, or the hour with the
+  target highest. Useful if your priorities differ from the sliders.
+* **Charts**: the score and the four criteria hour by hour, so you can see *why* an hour is good or bad. Grey bands = impossible hours.
+
+#### Where the data comes from
+
+* **Sky positions**: Astropy, a standard astronomy library, works fully offline.
+* **Weather**: the free Open-Meteo forecast (cloud, humidity, temperature, pressure, wind near the ground and at ~10 km high).
+  It reaches about 4 days ahead. If there is no internet or the date is too far away, SkyScore uses **made-up (synthetic) weather**
+  and says so clearly under the charts: results are then only a demo.
+* **Seeing**: there is no free seeing forecast for most places, so SkyScore estimates it with a Random Forest model
+  (a set of decision trees) that looks at the things that make air restless: strong wind high up (the jet stream),
+  wind near the ground, fast temperature and pressure changes, and humidity.
+
+#### How we check it is right
+
+After each session the club writes down in the **📝 Observing log** tab what the sky was really like (cloud, seeing, an overall 1–5 rating).
+SkyScore then replays the forecast it *would have had before* that night (an archived forecast, not hindsight)
+and compares. It is judged against a simple baseline, "always guess the average", so we can tell real skill from luck.
+Around 20–30 sessions are needed before the numbers mean much.
+
+> ⚠️ **Honest limits.** The seeing model has not yet learned from real measurements: it was trained on a physics-based
+> *estimate* of seeing, so its seeing numbers are an educated guess. Cloud comes from a real forecast and is the most
+> reliable part. Light pollution, local obstacles and dew on the optics are not included.
+"""
+
+INTRO_TECH_EN = r"""
+**Total score.** For each hour $t$, with goodness values $g_i(t)\in[0,1]$ and weights $w_i$ normalized so that $\sum_i w_i=1$:
+
+$$S(t) = \mathbb{1}[\text{observable}(t)]\sum_i w_i\,g_i(t).$$
+
+**Observable.** Target altitude $h>15°$ **and** Sun altitude below a limit that depends on the target:
+−18° (astronomical night) for galaxies, nebulae, clusters, Uranus and Neptune; −12° (nautical twilight) for constellations
+and Saturn's moons; −6° (civil twilight) for the Moon, Mercury, Venus, Mars, Jupiter, Saturn and Jupiter's moons;
+no limit for the Sun.
+
+**Positions.** Solar-system bodies come from Astropy's built-in ephemeris (`get_body`) as seen from your latitude/longitude;
+planetary moons use their planet's position (they stay within 0.2°). Deep-sky objects and constellations are fixed RA/Dec (J2000).
+Everything is converted to local altitude/azimuth for each hour.
+
+**Height in sky.** $g_{\text{alt}}=\max(0,\sin h)$, a stand-in for $1/\text{airmass}$.
+
+**Moon.** Illuminated fraction $k=(1+\cos i)/2$, with $i$ the Sun–Moon phase angle. With $\theta$ the Moon–target separation:
+
+$$g_{\text{moon}} = 1 - k\cdot\mathbb{1}[\text{Moon up}]\cdot\left(0.4 + 0.6\,e^{-\theta/40°}\right).$$
+
+A full Moon that is up always costs at least 0.4, up to 1.0 when it sits right next to the target.
+$g_{\text{moon}}=1$ when the target is the Sun or the Moon.
+
+**Clouds.** $g_{\text{cloud}} = 1 - c/100$, with $c$ the forecast cloud cover (%).
+
+**Seeing.** The Random Forest (200 trees) predicts seeing in arcseconds from 7 features: wind at 250 hPa (~10 km),
+wind at 10 m, |temperature change over 3 h|, |pressure change over 3 h|, temperature − dew point, relative humidity and cloud cover.
+It is trained on 240 days of synthetic weather labelled with a physics-inspired formula (the "proxy"), and checked with
+time-ordered cross-validation (no peeking into the future); the MAE/R² under the Planner charts come from that check, so they only
+show the model learned the proxy. Then $g_{\text{see}}$ maps 0.8″ (excellent) → 1 and 3.5″ (poor) → 0, clipped.
+
+**Best window.** The rolling mean of $S$ over $L$ consecutive hours; the highest one wins.
+
+**Trade-off hours (Pareto set).** Observable hours that no other hour beats on all four $g_i$ at once.
+
+**Confidence.** 500 weight vectors drawn uniformly at random (flat Dirichlet); the share that picks the same best hour.
+
+**Evaluation.** For each logged session, cloud and seeing forecasts are averaged over the session's hours using
+Open-Meteo's *historical forecast* archive. Metrics: cloud mean absolute error vs. always guessing the observed average;
+Spearman rank correlation between predicted and observed seeing; the 1–5 rating at SkyScore's top hour vs. a random logged hour.
 """
 
 INTRO_VI = r"""
 ### SkyScore là gì?
 
-SkyScore trả lời một câu hỏi rất thực tế của mọi CLB thiên văn:
-**"Tối nay, mấy giờ thì nên hướng kính thiên văn vào mục tiêu này?"**
+SkyScore trả lời một câu hỏi: **"Tối nay, mấy giờ thì nên hướng kính thiên văn vào mục tiêu này?"**
 
-Ứng dụng kết hợp bốn nguồn thông tin cho từng giờ trong ngày:
+Hãy hình dung SkyScore như một giám khảo **chấm điểm từng giờ trong đêm, từ 0 đến 1**, rồi chỉ ra vài giờ liên tiếp tốt nhất.
+Bạn không cần biết thiên văn để dùng: chọn địa điểm, ngày và mục tiêu, rồi đọc dòng kết luận màu xanh ở tab Lập lịch.
 
-| Thành phần | Nguồn | Ý nghĩa |
-|---|---|---|
-| 🌌 Độ cao mục tiêu | Astropy (tính toán thiên văn, không cần mạng) | Càng cao càng ít khí quyển cản (airmass nhỏ) |
-| 🌙 Mặt Trăng | Astropy | Trăng sáng, đang mọc và gần mục tiêu làm trời sáng lên |
-| ☁️ Mây | Open-Meteo (dự báo miễn phí) | Mây che thì không quan sát được |
-| ✨ Seeing | Mô hình Random Forest | Độ "rung" của ảnh sao do nhiễu loạn khí quyển (arcsec) |
+#### Cách hoạt động, trong 5 bước
 
-Mỗi tiêu chí được chuẩn hoá về thang **0 (xấu) – 1 (tốt)** rồi gộp thành điểm
+**1. Trải ra cả đêm.** SkyScore xét 24 giờ, từ trưa ngày bạn chọn đến trưa hôm sau, nên bao trọn buổi tối và cả đêm.
+(Với Mặt Trời thì xét ban ngày: từ nửa đêm đến nửa đêm.)
 
-$$S(t) = \mathbb{1}[\text{quan sát được}(t)]\sum_i w_i\,g_i(t), \qquad \sum_i w_i = 1.$$
+**2. Tính xem mọi thứ đang ở đâu trên trời.** Với từng giờ, ứng dụng tính mục tiêu cao bao nhiêu,
+Mặt Trời ở đâu, Mặt Trăng ở đâu và tròn bao nhiêu. Đây thuần là hình học, giống như đồng hồ: không cần mạng
+và chính xác đến từng phần nhỏ của một độ.
 
-Một giờ chỉ được tính là *quan sát được* khi mục tiêu cao hơn 15° và trời đủ tối cho mục tiêu đó:
-Mặt Trời thấp hơn −18° với thiên hà, tinh vân, cụm sao; −12° với chòm sao nhìn bằng mắt thường; −6° với hành tinh sáng.
-Bản thân Mặt Trời là mục tiêu ban ngày. Ánh trăng không bị tính là bất lợi khi mục tiêu là Mặt Trời hoặc Mặt Trăng.
+**3. Loại những giờ không thể quan sát.** Một giờ bị **0 điểm** nếu:
 
-#### Các con số được tính như thế nào
+* mục tiêu **thấp hơn 15°** so với đường chân trời (bị cây, nhà che, và phải nhìn xuyên qua quá nhiều lớp không khí), hoặc
+* trời **chưa đủ tối** cho loại mục tiêu đó. Thiên hà, tinh vân mờ cần trời tối hẳn;
+  chòm sao cần trời "gần tối"; hành tinh sáng và Mặt Trăng thì xem được ngay sau hoàng hôn một chút.
 
-* **Vị trí mục tiêu.** Hành tinh, Mặt Trăng, Mặt Trời và các vệ tinh hành tinh: Astropy tính vị trí trên bầu trời cho từng giờ từ lịch thiên văn (`get_body`), theo vĩ độ/kinh độ của bạn. Thiên thể xa (thiên hà, tinh vân, cụm sao) và chòm sao là các điểm cố định (RA/Dec). Mỗi vị trí được đổi sang bầu trời địa phương: **độ cao** $h$ so với đường chân trời.
-* **Độ khuất (có bị che không).** Mục tiêu bị đường chân trời che khi $h<0°$, và quá thấp để dùng được khi dưới 15° (khí quyển dày, nhà cửa, cây cối). Mặt Trời cũng phải đủ thấp: dưới −18°, −12° hoặc −6° tuỳ mục tiêu (xem trên). Ngoài các giới hạn này, giờ đó được 0 điểm.
-* **Điểm độ cao.** $g_{\text{alt}}=\max(0,\sin h)$, đại diện cho $1/\text{airmass}$: mục tiêu ở thiên đỉnh được 1, ở 30° được 0,5.
-* **Mặt Trăng.** Phần được chiếu sáng là $k=(1+\cos i)/2$, với $i$ là góc pha Mặt Trời–Mặt Trăng. Mức phạt tăng theo $k$ và giảm theo góc cách $\theta$ giữa Mặt Trăng và mục tiêu (như $e^{-\theta/40°}$); chỉ áp dụng khi Mặt Trăng ở trên đường chân trời.
-* **Mây và seeing.** Mây lấy từ dự báo Open-Meteo ($g=1-c/100$). Seeing (arcsec) do mô hình Random Forest dự đoán, rồi $g_{\text{see}}$ ánh xạ 0,8″ (tốt nhất) đến 3,5″ (tệ nhất) sang 1 đến 0.
+**4. Chấm mỗi giờ còn lại theo bốn tiêu chí**, mỗi tiêu chí từ 0 (xấu) đến 1 (tốt):
 
-Ngoài điểm tổng, ứng dụng còn đưa ra:
+| | Tiêu chí | Nói đơn giản | Dữ liệu lấy từ đâu |
+|---|---|---|---|
+| 🌌 | **Độ cao** | Mục tiêu càng cao thì càng ít lớp không khí cản, nên nhìn rõ và sáng hơn. Ở đỉnh đầu = 1, ở lưng chừng (30°) = 0,5. | Tính toán (Astropy) |
+| 🌙 | **Trăng tối** | Trăng sáng giống như đèn đường, làm cả bầu trời sáng lên và "nuốt" mất các vật mờ. Hại nhất khi trăng tròn, đang ở trên trời và nằm gần mục tiêu. Trăng non hoặc trăng đã lặn = 1. | Tính toán (Astropy) |
+| ☁️ | **Trời quang** | Mây che thì không thấy gì. Không mây = 1, mây kín trời = 0. | Dự báo thời tiết (Open-Meteo, miễn phí) |
+| ✨ | **Khí quyển ổn định (seeing)** | Kể cả khi trời quang, không khí chuyển động làm sao "sôi" và lấp lánh, chi tiết bị nhoè. Quan trọng nhất khi xem hành tinh và Mặt Trăng. | Mô hình học máy dự đoán từ dự báo thời tiết |
 
-* **Cửa sổ tốt nhất**: khoảng *L* giờ liên tiếp có điểm trung bình cao nhất.
-* **Tập Pareto**: các giờ không bị giờ nào khác vượt trội ở *cả bốn* tiêu chí — xem được sự đánh đổi mà không cần chọn trọng số.
-* **Độ bền vững**: thử 500 bộ trọng số ngẫu nhiên; nếu đa số vẫn chọn cùng một giờ thì khuyến nghị đáng tin.
+**5. Cộng điểm theo ưu tiên của bạn.** Mỗi mục đích quan tâm những thứ khác nhau, nên mỗi tiêu chí có một trọng số
+(mức độ quan trọng). Chọn **Bạn muốn quan sát gì?** là ứng dụng tự đặt trọng số:
 
-> ⚠️ **Lưu ý trung thực về dữ liệu:** mô hình seeing hiện được huấn luyện trên *nhãn giả lập*
-> (công thức vật lý gần đúng), chưa phải số đo thật. Chỉ số MAE/R² hiển thị ở tab Planner chỉ
-> chứng minh pipeline hoạt động, **không** chứng minh khả năng dự báo thực tế.
+| Mục đích | Độ cao | Trăng | Mây | Seeing |
+|---|---|---|---|---|
+| Cân bằng (mặc định) | 35% | 20% | 30% | 15% |
+| Thiên hà & tinh vân mờ | 25% | **35%** | 30% | 10% |
+| Hành tinh & Mặt Trăng | 35% | 5% | 25% | **35%** |
+| Buổi quan sát công chúng | 25% | 10% | **55%** | 10% |
+
+Điểm tổng của một giờ là trung bình có trọng số của bốn điểm trên, nên cũng nằm trong khoảng 0 đến 1.
+Quy ước dễ nhớ: **trên 0,7 là tốt, 0,5–0,7 là tạm được, dưới 0,5 là kém.**
+
+#### Kết quả bạn nhận được
+
+* **Cửa sổ tốt nhất**: khối giờ liên tiếp (bạn chọn dài bao lâu) có điểm trung bình cao nhất. Đây chính là câu trả lời "nên ra lúc…".
+* **Độ tin cậy**: SkyScore chọn lại 500 lần với các bộ ưu tiên ngẫu nhiên. Nếu phần lớn vẫn ra cùng một giờ, kết quả không
+  phụ thuộc vào cách bạn kéo thanh trượt, nên rất đáng tin. Giá trị thấp nghĩa là "tuỳ bạn ưu tiên điều gì".
+* **Các giờ tốt khác (đánh đổi)**: những giờ không thể bị vượt mặt ở ít nhất một mặt, ví dụ giờ trời quang nhất, hoặc giờ
+  mục tiêu lên cao nhất. Hữu ích khi ưu tiên của bạn khác với thanh trượt.
+* **Biểu đồ**: điểm và bốn tiêu chí theo từng giờ, để thấy *vì sao* một giờ tốt hay xấu. Vùng xám = giờ không quan sát được.
+
+#### Dữ liệu lấy từ đâu
+
+* **Vị trí thiên thể**: Astropy, thư viện thiên văn chuẩn, chạy hoàn toàn không cần mạng.
+* **Thời tiết**: dự báo miễn phí của Open-Meteo (mây, độ ẩm, nhiệt độ, áp suất, gió sát mặt đất và gió ở độ cao ~10 km).
+  Dự báo xa được khoảng 4 ngày. Nếu không có mạng hoặc ngày quá xa, SkyScore dùng **thời tiết giả lập**
+  và ghi rõ bên dưới biểu đồ: khi đó kết quả chỉ để minh hoạ.
+* **Seeing**: hầu hết các nơi không có dự báo seeing miễn phí, nên SkyScore ước lượng bằng mô hình Random Forest
+  (một "rừng" cây quyết định) dựa trên những thứ làm không khí xáo động: gió mạnh trên cao (dòng tia),
+  gió sát mặt đất, nhiệt độ và áp suất thay đổi nhanh, và độ ẩm.
+
+#### Làm sao biết SkyScore đúng hay sai
+
+Sau mỗi buổi, CLB ghi lại trong tab **📝 Nhật ký quan sát** bầu trời thực tế ra sao (mây, seeing, điểm chung 1–5).
+SkyScore sau đó dựng lại dự báo mà nó *lẽ ra đã có trước* đêm đó (dự báo lưu trữ, không phải "biết trước kết quả")
+rồi so sánh. Nó được so với một cách đoán đơn giản, "lúc nào cũng đoán bằng mức trung bình", để phân biệt giỏi thật với may mắn.
+Cần khoảng 20–30 buổi thì các con số mới có ý nghĩa.
+
+> ⚠️ **Giới hạn cần biết.** Mô hình seeing chưa được học từ số đo thật: nó được huấn luyện trên một *ước lượng*
+> seeing theo công thức vật lý, nên con số seeing chỉ là phỏng đoán có cơ sở. Mây lấy từ dự báo thật và là phần
+> đáng tin nhất. Ô nhiễm ánh sáng, vật cản tại chỗ và hơi sương đọng trên kính chưa được tính đến.
+"""
+
+INTRO_TECH_VI = r"""
+**Điểm tổng.** Với mỗi giờ $t$, điểm thành phần $g_i(t)\in[0,1]$ và trọng số $w_i$ đã chuẩn hoá sao cho $\sum_i w_i=1$:
+
+$$S(t) = \mathbb{1}[\text{quan sát được}(t)]\sum_i w_i\,g_i(t).$$
+
+**Quan sát được.** Độ cao mục tiêu $h>15°$ **và** độ cao Mặt Trời thấp hơn một ngưỡng tuỳ mục tiêu:
+−18° (đêm thiên văn) cho thiên hà, tinh vân, cụm sao, Sao Thiên Vương, Sao Hải Vương; −12° (chạng vạng hàng hải) cho chòm sao
+và vệ tinh Sao Thổ; −6° (chạng vạng dân sự) cho Mặt Trăng, Sao Thuỷ, Sao Kim, Sao Hoả, Sao Mộc, Sao Thổ và vệ tinh Sao Mộc;
+không giới hạn với Mặt Trời.
+
+**Vị trí.** Thiên thể trong Hệ Mặt Trời lấy từ lịch thiên văn có sẵn của Astropy (`get_body`), nhìn từ vĩ độ/kinh độ của bạn;
+vệ tinh hành tinh dùng vị trí của hành tinh (luôn cách dưới 0,2°). Thiên thể sâu và chòm sao là toạ độ RA/Dec cố định (J2000).
+Tất cả được đổi sang độ cao/phương vị địa phương cho từng giờ.
+
+**Độ cao.** $g_{\text{alt}}=\max(0,\sin h)$, đại diện cho $1/\text{airmass}$.
+
+**Mặt Trăng.** Phần được chiếu sáng $k=(1+\cos i)/2$, với $i$ là góc pha Mặt Trời–Mặt Trăng. Với $\theta$ là góc cách giữa Mặt Trăng và mục tiêu:
+
+$$g_{\text{moon}} = 1 - k\cdot\mathbb{1}[\text{Trăng trên trời}]\cdot\left(0{,}4 + 0{,}6\,e^{-\theta/40°}\right).$$
+
+Trăng tròn đang ở trên trời luôn trừ ít nhất 0,4, tối đa 1,0 khi nằm sát mục tiêu.
+$g_{\text{moon}}=1$ khi mục tiêu là Mặt Trời hoặc Mặt Trăng.
+
+**Mây.** $g_{\text{cloud}} = 1 - c/100$, với $c$ là lượng mây dự báo (%).
+
+**Seeing.** Random Forest (200 cây) dự đoán seeing theo giây cung từ 7 đặc trưng: gió ở mực 250 hPa (~10 km),
+gió ở 10 m, |thay đổi nhiệt độ trong 3 giờ|, |thay đổi áp suất trong 3 giờ|, nhiệt độ − điểm sương, độ ẩm tương đối và lượng mây.
+Mô hình học trên 240 ngày thời tiết giả lập được gắn nhãn bằng công thức lấy cảm hứng từ vật lý (nhãn "giả lập"), và được kiểm tra
+bằng kiểm định chéo theo thứ tự thời gian (không nhìn trước tương lai); MAE/R² dưới biểu đồ ở tab Lập lịch lấy từ phép kiểm tra này,
+nên chỉ cho thấy mô hình đã học được công thức giả lập. Sau đó $g_{\text{see}}$ ánh xạ 0,8″ (rất tốt) → 1 và 3,5″ (kém) → 0, có cắt biên.
+
+**Cửa sổ tốt nhất.** Trung bình trượt của $S$ trên $L$ giờ liên tiếp; cửa sổ cao nhất được chọn.
+
+**Giờ đánh đổi (tập Pareto).** Các giờ quan sát được mà không giờ nào khác vượt trội ở cả bốn $g_i$ cùng lúc.
+
+**Độ tin cậy.** 500 bộ trọng số rút ngẫu nhiên đều (phân phối Dirichlet phẳng); tỉ lệ bộ chọn cùng giờ tốt nhất.
+
+**Đánh giá.** Với mỗi buổi đã ghi, dự báo mây và seeing được lấy trung bình trên các giờ của buổi, dùng kho
+*dự báo lịch sử* của Open-Meteo. Chỉ số: sai số tuyệt đối trung bình của mây so với cách luôn đoán bằng trung bình quan sát;
+tương quan thứ hạng Spearman giữa seeing dự đoán và quan sát; điểm 1–5 ở giờ SkyScore chọn so với một giờ đã ghi bất kỳ.
 """
 
 GUIDE_EN = """
@@ -343,6 +495,8 @@ TEXT = {
         "cmp_cols": {"hour": "Session", "date": "Date", "site": "Place", "cloud_f": "Cloud forecast", "cloud_o": "Cloud seen",
                      "see_f": "Seeing forecast", "see_o": "Seeing seen", "q_f": "SkyScore score", "q_o": "Your rating"},
         "intro": INTRO_EN,
+        "intro_tech_title": "🔬 For the curious: the exact formulas",
+        "intro_tech": INTRO_TECH_EN,
         "guide": GUIDE_EN,
         "zero_weights": "Set at least one weight above 0.",
         "computing": "Computing…",
@@ -460,6 +614,8 @@ TEXT = {
         "cmp_cols": {"hour": "Buổi", "date": "Ngày", "site": "Địa điểm", "cloud_f": "Mây dự báo", "cloud_o": "Mây thực tế",
                      "see_f": "Seeing dự báo", "see_o": "Seeing thực tế", "q_f": "Điểm SkyScore", "q_o": "Bạn đánh giá"},
         "intro": INTRO_VI,
+        "intro_tech_title": "🔬 Dành cho người tò mò: công thức chi tiết",
+        "intro_tech": INTRO_TECH_VI,
         "guide": GUIDE_VI,
         "zero_weights": "Hãy đặt ít nhất một trọng số lớn hơn 0.",
         "computing": "Đang tính toán…",
@@ -725,6 +881,8 @@ with tab_log:
 
 with tab_intro:
     st.markdown(T["intro"])
+    with st.expander(T["intro_tech_title"]):
+        st.markdown(T["intro_tech"])
 with tab_guide:
     st.markdown(T["guide"])
 
