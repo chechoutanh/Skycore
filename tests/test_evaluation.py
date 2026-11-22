@@ -54,3 +54,21 @@ def test_unknown_method_rejected(tmp_path, logs):
     pd.read_csv(ob).assign(seeing_method="good").to_csv(ob, index=False)
     with pytest.raises(ValueError, match="seeing_method"):
         load_logs(ev, ob)
+
+
+def test_duration_averages_forecast_over_session(tmp_path):
+    ev = tmp_path / "events.csv"
+    ob = tmp_path / "observations.csv"
+    ev.write_text("event_id,date,club,site,lat,lon,utc_offset,target\nE01,2026-01-15,A,HCM,10.78,106.70,7,M42 (Orion Nebula)\n")
+    ob.write_text(
+        "event_id,time,seeing_value,seeing_method,cloud_observed,quality_rating,duration_h\n"
+        "E01,19:00,2,fwhm_arcsec,10,4,\n"
+        "E01,20:00,2,fwhm_arcsec,10,4,\n"
+        "E01,21:00,2,fwhm_arcsec,10,4,\n"
+        "E01,20:00,2,fwhm_arcsec,10,4,2\n"
+    )
+    X, y = simulated_training_set(hours=24 * 30)
+    df = add_predictions(load_logs(str(ev), str(ob)), SeeingModel(n_estimators=20).fit(X, y), offline=True)
+    # 20:00 with a 2 h session covers 19:00-21:00, so it equals the mean of those three hours.
+    for col in ["cloud_forecast", "seeing_pred", "score"]:
+        assert df[col].iloc[3] == pytest.approx(df[col].iloc[:3].mean())

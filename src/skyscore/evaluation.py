@@ -48,17 +48,30 @@ def load_logs(events_path: str, observations_path: str) -> pd.DataFrame:
     local = pd.to_datetime(df["date"]) + pd.to_timedelta(df["time"].astype(str) + ":00")
     # Hours after midnight belong to the night that started on `date`; Sun sessions are daytime, same day.
     local += pd.to_timedelta(((local.dt.hour < 12) & (df["target"] != "Sun")).astype(int), unit="D")
-    df["hour_utc"] = (local - pd.to_timedelta(df["utc_offset"], unit="h")).dt.round("h")
+    df["mid_utc"] = local - pd.to_timedelta(df["utc_offset"], unit="h")
+    df["hour_utc"] = df["mid_utc"].dt.round("h")
+    if "duration_h" not in df:
+        df["duration_h"] = np.nan
     return df
 
 
 def add_predictions(df: pd.DataFrame, model: SeeingModel, offline: bool = False) -> pd.DataFrame:
-    """Attach forecast cloud, predicted seeing and score S to every logged hour."""
+    """Attach forecast cloud, predicted seeing and score S to every logged row.
+
+    A row with ``duration_h`` summarizes a session centred on ``time``: it is compared with the
+    forecast averaged over the hours inside that session. Without it, the nearest hour is used.
+    """
     parts = []
     for _, g in df.groupby("event_id", sort=False):
         e = g.iloc[0]
+        half = pd.to_timedelta(g["duration_h"].fillna(0) / 2, unit="h")
+        start = (g["mid_utc"] - half).dt.ceil("h")
+        end = (g["mid_utc"] + half).dt.floor("h")
+        # Always include the nearest hour, so short or unset durations fall back to it.
+        start = start.where(start <= g["hour_utc"], g["hour_utc"])
+        end = end.where(end >= g["hour_utc"], g["hour_utc"])
         # Continuous grid with 3 h lead-in, because features use 3-hour differences.
-        grid = pd.date_range(g["hour_utc"].min() - pd.Timedelta(hours=3), g["hour_utc"].max(), freq="h")
+        grid = pd.date_range(start.min() - pd.Timedelta(hours=3), end.max(), freq="h")
         weather, source = get_forecast(e["lat"], e["lon"], grid, offline=offline)
         t = sky_table(e["lat"], e["lon"], e["target"], grid).join(weather)
         t["seeing_pred"] = model.predict(make_features(weather))
@@ -66,7 +79,9 @@ def add_predictions(df: pd.DataFrame, model: SeeingModel, offline: bool = False)
         t = t[["cloud_cover", "seeing_arcsec", "score", "observable"]].rename(
             columns={"cloud_cover": "cloud_forecast", "seeing_arcsec": "seeing_pred"}
         )
-        parts.append(g.join(t, on="hour_utc").assign(weather_source=source))
+        agg = {"cloud_forecast": "mean", "seeing_pred": "mean", "score": "mean", "observable": "any"}
+        pred = pd.DataFrame([t.loc[s:e_].agg(agg) for s, e_ in zip(start, end)], index=g.index)
+        parts.append(g.join(pred).assign(weather_source=source))
     return pd.concat(parts)
 
 

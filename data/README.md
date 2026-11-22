@@ -25,6 +25,7 @@ Real measurements from club observing events, used by `python -m skyscore.evalua
 |---|---|---|
 | `event_id` | E01 | |
 | `time` | 21:00 | Local time; hours after midnight (e.g. 01:00) are counted in the same night |
+| `duration_h` | 2 | Optional. Set when the row summarizes a whole session: `time` is its midpoint (20:00 for 19:00–21:00) and the forecast is averaged over the session. Leave empty for a single hour |
 | `seeing_value` | 2.4 | Number on the scale given in `seeing_method` |
 | `seeing_method` | `fwhm_arcsec` | `fwhm_arcsec` (from images, lower = better), `pickering_1_10` (10 = best), `scale_1_5` (5 = best) |
 | `cloud_observed` | 30 | % of sky covered (okta × 12.5 if you logged okta) |
