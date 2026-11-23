@@ -723,6 +723,12 @@ tab_plan, tab_nights, tab_log, tab_intro, tab_guide = st.tabs(T["tabs"])
 
 # Other tabs are filled first so they still render if the planner calls st.stop().
 with tab_nights:
+    # Hover zoom for the photo grid (st.image is only used here).
+    st.markdown("""<style>
+    [data-testid="stImage"] img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; transition: transform .25s ease, box-shadow .25s ease; position: relative; }
+    [data-testid="stImage"] img:hover { transform: scale(1.8); z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,.6); border-radius: 6px; }
+    [data-testid="stColumn"]:has(img:hover), [data-testid="stImage"]:has(img:hover) { z-index: 100; overflow: visible; }
+    </style>""", unsafe_allow_html=True)
     st.markdown(T["nights_intro"])
     ev = pd.read_csv(EVENTS).sort_values("date", ascending=False)
     def count(col):  # "~40+" -> 40; missing column or text -> NaN
@@ -741,7 +747,7 @@ with tab_nights:
             continue
         shown += 1
         st.divider()
-        name = e.get("event_name")
+        name = e.get("event_name_en") if lang == "en" and isinstance(e.get("event_name_en"), str) else e.get("event_name")
         has_name = isinstance(name, str) and name.strip()
         st.subheader(name if has_name else e["site"])
         looked_at = ", ".join(x for x in (e["target"], e["other_targets"]) if isinstance(x, str) and x.strip())
